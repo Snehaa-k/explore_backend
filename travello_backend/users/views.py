@@ -306,10 +306,10 @@ class TravellerProfile(APIView):
 
     def get(self, request, *args, **kwargs):
         try:
-            # Get the user model
+            
             user = Usermodels.objects.get(id=request.user.id)
 
-            # Attempt to get the user's profile
+            
             try:
                 detail = UserProfile.objects.get(user=request.user.id)
                 user_serializer = UserSerializer(user)
@@ -317,9 +317,9 @@ class TravellerProfile(APIView):
                 profile_serializer = ProfileSerializer(detail)
                 return Response({"profile":profile_serializer.data,"user":user_serializer.data}, status=status.HTTP_200_OK)
             except UserProfile.DoesNotExist:
-                # If UserProfile does not exist, return the user model data
+                
                 user_serializer = UserSerializer(user)
-                return Response(user_serializer.data, status=status.HTTP_200_OK)
+                return Response({"user":user_serializer.data}, status=status.HTTP_200_OK)
 
         except Usermodels.DoesNotExist:
             return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
