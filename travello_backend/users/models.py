@@ -16,7 +16,7 @@ class Usermodels(AbstractUser):
     is_travel_leader = models.BooleanField(default=False)
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
-    is_block = models.BooleanField(default=True)
+    is_block = models.BooleanField(default=False)
     otp = models.CharField(max_length=254,null = True)
     is_verified = models.BooleanField(default=False)
     is_approve_leader = models.BooleanField(default=False)

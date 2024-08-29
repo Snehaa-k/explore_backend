@@ -54,7 +54,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
      'REFRESH_TOKEN_LIFETIME': timedelta(days=5),
      'ROTATE_REFRESH_TOKENS': True,
      'BLACKLIST_AFTER_ROTATION': True
@@ -197,5 +197,3 @@ EMAIL_HOST_USER = 'worldmagical491@gmail.com'
 EMAIL_HOST_PASSWORD = 'sgnk kvjt sdnn gylh'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# GOOLE_CLIENT_ID = "127884352546-862d4rg3jf73ud2tk29hggstutg9ca0i.apps.googleusercontent.com"
-# GOOLE_CLIENT_SECRET = "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"
