@@ -118,5 +118,26 @@ def handle_travel_leader_form_save(sender, instance, created, **kwargs):
                 fail_silently=False,
             )
 
-    
 
+class Trips(models.Model):
+    travelead = models.ForeignKey(Usermodels,on_delete=models.CASCADE)
+    image  =    models.ImageField(upload_to='media', blank=True, null=True)
+    location =   models.CharField(max_length=250,null=True)
+    type_of_Trip = models.CharField(max_length=250,null=True)
+    startDate =  models.DateField()
+    endDate = models.DateField()
+    duration = models.IntegerField(null=True,blank=True)
+    description= models.TextField(max_length=345,null=True,blank=True)
+    accommodation = models.CharField(max_length=234,null=True,blank=True)
+    transportation =  models.CharField(max_length=345)
+    amount =  models.IntegerField()
+    participant_Limit = models.IntegerField()
+    def __str__(self):
+        return f"{self.location} - {self.type_of_Trip} by {self.travel_lead.username}"
+
+class Place(models.Model):
+    trip = models.ForeignKey(Trips, related_name='places', on_delete=models.CASCADE)
+    place_name = models.CharField(max_length=250)
+    description = models.TextField(max_length=500, null=True, blank=True)
+    accomodation = models.TextField(max_length=234,null= True,blank = True)
+    Transportation = models.TextField(max_length=234,null=True,blank=True)

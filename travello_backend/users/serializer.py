@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country
+from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -75,3 +75,16 @@ class FormSubmission(serializers.ModelSerializer):
         instance = super().update(instance, validated_data)
         instance.visited_countries.set(selected_countries)
         return instance
+    
+    class TripSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Trips
+            fields = [
+                'id', 'image', 'location', 'type_of_trip', 'start_date', 'end_date',
+                'duration', 'description', 'accommodation', 'transportation',
+                'amount', 'participant_limit'
+            ]
+    class PlaceSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = Place
+            fields = ['id', 'trip', 'place_name', 'description', 'accomodation','transportation']
