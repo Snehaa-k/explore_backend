@@ -76,15 +76,32 @@ class FormSubmission(serializers.ModelSerializer):
         instance.visited_countries.set(selected_countries)
         return instance
     
-    class TripSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = Trips
-            fields = [
-                'id', 'image', 'location', 'type_of_trip', 'start_date', 'end_date',
-                'duration', 'description', 'accommodation', 'transportation',
-                'amount', 'participant_limit'
-            ]
-    class PlaceSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = Place
-            fields = ['id', 'trip', 'place_name', 'description', 'accomodation','transportation']
+class TripSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Trips
+        fields = [
+            'id',
+            'Trip_image', 
+            'location', 
+            'trip_type',  
+            'start_date', 
+            'end_date',    
+            'duration', 
+            'description', 
+            'accomodation', 
+            'transportation', 
+            'amount', 
+            'participant_limit'  
+        ]
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user
+
+        
+        trip = Trips.objects.create(travelead=user, **validated_data)
+        return trip
+
+class PlaceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Place
+        fields = ['id', 'trip', 'place_name', 'description', 'accomodation','Transportation']

@@ -20,6 +20,11 @@ urlpatterns = [
     path('travellerprofile/', views.TravellerProfile.as_view(), name='travellerprofile'),
     path('editprofile/', views.UserProfileEdit.as_view(), name='editprofile'),
     path('profile/', views.UserProfileCreate.as_view(), name='udateprofile'),
+    path('createtrip/', views.CreateTrip.as_view(), name='createtrip'),
+    path('viewtrip/', views.ViewTrips.as_view(), name='viewtrip'),
+    path('updatetrip/', views.EditTrips.as_view(), name='updatetrip'),
+    path('addplaces/', views.AddPlaces.as_view(), name='addplaces'),
+    path('viewplaces/<int:id>/', views.ViewPlaces.as_view(), name='addplaces'),
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 
 

@@ -2,11 +2,11 @@ from datetime import datetime, timezone
 import json
 from tokenize import TokenError
 from django.shortcuts import render
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country
+from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
-from .serializer import UserSerializer,ProfileSerializer,FormSubmission
+from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import update_last_login
@@ -392,3 +392,134 @@ class UserProfileCreate(APIView):
 
         serializer = ProfileSerializer(profile)
         return Response(serializer.data)
+
+
+class CreateTrip(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        print(request.data,"hii")
+        print(request.user.id)
+        try:
+            user = Usermodels.objects.get(id = request.user.id)
+        
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = TripSerializer(data=request.data,context={'request': request})
+
+        if serializer.is_valid():
+            trip = serializer.save()
+            user_data = TripSerializer(trip).data
+            return Response({"message": "User created successfully. OTP sent.",
+                             "user": user_data }, status=status.HTTP_201_CREATED)
+        print(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ViewTrips(APIView):
+     def get(self, request, *args, **kwargs):
+        user_id = request.user.id
+        print(user_id)
+        try:
+            trip = Trips.objects.get(travelead=user_id)
+
+            print(trip)
+            
+        except Trips.DoesNotExist:
+            return Response({'error': 'trip not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = TripSerializer(trip)
+        # print(serializer.data)
+        return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
+     
+class EditTrips(APIView):
+    
+    def post(self, request, *args, **kwargs):
+        user_id = request.user.id
+        print(request.data)
+        
+        try:
+            trips, created = Trips.objects.get_or_create(travelead=user_id)
+        except Trips.DoesNotExist:
+            return Response({'error': 'trip not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        
+
+
+        
+        accommodation = request.data.get('accommodation')
+        transportation = request.data.get('transportation')
+        participant = request.data.get('participant_limit')
+        amount = request.data.get('amount')
+        duration = request.data.get('duration') 
+        start_date = request.data.get('start_date')
+        
+        
+        
+        trips.accomodation = accommodation
+        trips.transportation = transportation
+        trips.participant_limit = participant
+        trips.duration = duration
+        trips.start_date = start_date
+        trips.amount = amount
+        trips.save()
+        
+        if created:
+            message = "trip created successfully"
+        else:
+            message = "trip updated successfully"
+        
+        return Response({"message": message}, status=status.HTTP_200_OK)
+
+class AddPlaces(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        print(request.data,"hii")
+        trip_id = request.data.get('tripId')
+        print(trip_id)
+        try:
+            trip  = Trips.objects.get(id = trip_id )
+        
+        except Trips.DoesNotExist:
+            return Response({'error': 'not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = PlaceSerializer(data=request.data)
+
+        if serializer.is_valid():
+            trip = serializer.save()
+            user_data = PlaceSerializer(trip).data
+            return Response({"message": "places added successfully. OTP sent.",
+                             "places": user_data }, status=status.HTTP_201_CREATED)
+        print(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
+
+
+class ViewPlaces(APIView):
+    def get(self, request,id, *args, **kwargs):
+        
+        # trip_id = request.data.get('tripId')
+        user = Usermodels.objects.get(id = request.user.id)
+        if user:
+        
+        # print(trip_id)
+            try:
+                trip = Place.objects.get(trip=id)
+                
+
+                print(trip)
+                
+            except Trips.DoesNotExist:
+                return Response({'error': 'trip not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            serializer = PlaceSerializer(trip)
+            # print(serializer.data)
+            return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        
+
+    
+    
+    
+    
