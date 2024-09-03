@@ -77,10 +77,13 @@ class FormSubmission(serializers.ModelSerializer):
         return instance
     
 class TripSerializer(serializers.ModelSerializer):
+    travelead_username = serializers.CharField(source='travelead.username', read_only=True)
+    travelead_profile_image = serializers.SerializerMethodField()
     class Meta:
         model = Trips
         fields = [
             'id',
+            'travelead_username',
             'Trip_image', 
             'location', 
             'trip_type',  
@@ -91,7 +94,8 @@ class TripSerializer(serializers.ModelSerializer):
             'accomodation', 
             'transportation', 
             'amount', 
-            'participant_limit'  
+            'participant_limit' ,
+            'travelead_profile_image' ,
         ]
     def create(self, validated_data):
         request = self.context.get('request')
@@ -100,6 +104,17 @@ class TripSerializer(serializers.ModelSerializer):
         
         trip = Trips.objects.create(travelead=user, **validated_data)
         return trip
+    def get_travelead_profile_image(self, obj):
+        try:
+            # Fetch the UserProfile associated with the travelead
+            user_profile = UserProfile.objects.get(user=obj.travelead)
+            if user_profile.profile_image:
+                request = self.context.get('request')
+                # Build an absolute URI for the profile image
+                return request.build_absolute_uri(user_profile.profile_image.url)
+            return None
+        except UserProfile.DoesNotExist:
+            return None
 
 class PlaceSerializer(serializers.ModelSerializer):
     class Meta:

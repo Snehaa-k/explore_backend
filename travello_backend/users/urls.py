@@ -24,7 +24,10 @@ urlpatterns = [
     path('viewtrip/', views.ViewTrips.as_view(), name='viewtrip'),
     path('updatetrip/', views.EditTrips.as_view(), name='updatetrip'),
     path('addplaces/', views.AddPlaces.as_view(), name='addplaces'),
-    path('viewplaces/<int:id>/', views.ViewPlaces.as_view(), name='addplaces'),
+    path('viewplaces/<int:id>/', views.ViewPlaces.as_view(), name='viewplaces'),
+    path('editplaces/<int:id>/', views.EditPlace.as_view(), name='editplaces'),
+    path('deleteplaces/<int:id>', views.DeleteItem.as_view(), name='delete'),
+    path('viewalltrips/', views.ViewAllTrips.as_view(), name='view_all_trips'),
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 
 

@@ -135,6 +135,7 @@ class Trips(models.Model):
     def __str__(self):
         return f"{self.location} - {self.trip_type} by {self.travelead.username}"
 
+
 class Place(models.Model):
     trip = models.ForeignKey(Trips, on_delete=models.CASCADE)
     place_name = models.CharField(max_length=250)

@@ -432,6 +432,8 @@ class ViewTrips(APIView):
         # print(serializer.data)
         return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
      
+
+
 class EditTrips(APIView):
     
     def post(self, request, *args, **kwargs):
@@ -495,6 +497,8 @@ class AddPlaces(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
 
 
+
+
 class ViewPlaces(APIView):
     def get(self, request,id, *args, **kwargs):
         
@@ -504,20 +508,82 @@ class ViewPlaces(APIView):
         
         # print(trip_id)
             try:
-                trip = Place.objects.get(trip=id)
-                
-
-                print(trip)
-                
+                trip_obj = Trips.objects.get(id = id)
+                trip = Place.objects.filter(trip = trip_obj)
+                print("asdfasdfasdf",trip)
             except Trips.DoesNotExist:
                 return Response({'error': 'trip not found'}, status=status.HTTP_404_NOT_FOUND)
 
-            serializer = PlaceSerializer(trip)
+            serializer = PlaceSerializer(trip,many=True)
             # print(serializer.data)
+
             return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
         return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
 
+
+class EditPlace(APIView):
+     def post(self, request, id, *args, **kwargs):
+        user_id = request.user.id
+        place_name = request.data.get('place_name')
+        accommodation = request.data.get('accomodation')
+        transportation = request.data.get('transportation')
+        description = request.data.get('description')
         
+       
+        try:
+            place = Place.objects.get(id=id)
+        except Place.DoesNotExist:
+            return Response({'error': 'Place not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            trip = Trips.objects.get(id=request.data.get('trip_id'), travelead=user_id)
+        except Trips.DoesNotExist:
+            return Response({'error': 'Trip not found or not authorized'}, status=status.HTTP_404_NOT_FOUND)
+
+        place.trip = trip  
+        place.place_name = place_name
+        place.accomodation = accommodation
+        place.Transportation = transportation
+        place.description = description
+
+        place.save()
+
+        return Response({"message": "Place updated successfully"}, status=status.HTTP_200_OK)
+
+
+class DeleteItem(APIView):
+    def delete(self, request, id, *args, **kwargs):
+        try:
+            item = Place.objects.get(id=id)
+            item.delete()
+            return Response({"message": "Item deleted successfully"}, status=status.HTTP_200_OK)
+        except Place.DoesNotExist:
+            return Response({"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)   
+
+
+class ViewAllTrips(APIView):
+     def get(self, request, *args, **kwargs):
+        user_id = request.user.id
+        print(user_id)
+        try:
+            user = Usermodels.objects.get(id = user_id)
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+        if user:
+
+            try:
+                trip = Trips.objects.select_related('travelead').all()
+                print(trip)
+                
+            except Trips.DoesNotExist:
+                return Response({'error': 'trip not found'},status=status.HTTP_404_NOT_FOUND)
+            
+        
+
+        
+        serializer = TripSerializer(trip,many=True,context={'request': request})
+        return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
+
 
     
     
