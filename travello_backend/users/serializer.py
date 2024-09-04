@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place
+from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -78,12 +78,16 @@ class FormSubmission(serializers.ModelSerializer):
     
 class TripSerializer(serializers.ModelSerializer):
     travelead_username = serializers.CharField(source='travelead.username', read_only=True)
+    travelead_email = serializers.CharField(source='travelead.email', read_only=True)
+
+    
     travelead_profile_image = serializers.SerializerMethodField()
     class Meta:
         model = Trips
         fields = [
             'id',
             'travelead_username',
+            'travelead_email',
             'Trip_image', 
             'location', 
             'trip_type',  
@@ -104,6 +108,7 @@ class TripSerializer(serializers.ModelSerializer):
         
         trip = Trips.objects.create(travelead=user, **validated_data)
         return trip
+    
     def get_travelead_profile_image(self, obj):
         try:
             # Fetch the UserProfile associated with the travelead
@@ -120,3 +125,38 @@ class PlaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Place
         fields = ['id', 'trip', 'place_name', 'description', 'accomodation','Transportation']
+    
+    
+    
+    
+
+
+class PostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['id','travel_leader','post_image','description','article','created_at']
+        read_only_fields = ['id', 'travel_leader', 'created_at']
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user
+
+        validated_data['travel_leader'] = user
+
+        post = Post.objects.create(**validated_data)
+        return post
+
+class ArticleSerilizer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ['__all__']
+        read_only_fields = ['id', 'travel_leader', 'created_at']
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user
+
+        validated_data['travel_leader'] = user
+
+        post = ArticlePost.objects.create(**validated_data)
+        return post
+    
+

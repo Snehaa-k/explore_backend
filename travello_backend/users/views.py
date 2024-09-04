@@ -6,7 +6,7 @@ from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
-from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer
+from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticlePost
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import update_last_login
@@ -562,7 +562,7 @@ class DeleteItem(APIView):
 
 
 class ViewAllTrips(APIView):
-     def get(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         user_id = request.user.id
         print(user_id)
         try:
@@ -584,6 +584,108 @@ class ViewAllTrips(APIView):
         serializer = TripSerializer(trip,many=True,context={'request': request})
         return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
 
+
+class TripDetails(APIView):
+    def get(self, request,id, *args, **kwargs):
+        user_id = request.user.id
+        print(user_id)
+        try:
+            user = Usermodels.objects.get(id = user_id)
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+        if user:
+
+            try:
+                trip = Trips.objects.select_related('travelead').get(id = id)
+                print(trip)
+                
+            except Trips.DoesNotExist:
+                return Response({'error': 'trip not found'},status=status.HTTP_404_NOT_FOUND)
+            
+        
+
+        
+        serializer = TripSerializer(trip,context={'request': request})
+        return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
+
+    
+class PlaceDetails(APIView):
+    def get(self, request,id, *args, **kwargs):
+        user_id = request.user.id
+        print(user_id)
+        try:
+            user = Usermodels.objects.get(id = user_id)
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+        if user:
+
+            try:
+                trip = Place.objects.select_related('trip').filter( trip = id)
+                print(trip)
+                
+            except Place.DoesNotExist:
+                return Response({'error': 'trip not found'},status=status.HTTP_404_NOT_FOUND)
+            
+        
+
+        
+        serializer = PlaceSerializer(trip,many=True)
+        return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
+
+
+
+class PostCreation(APIView):
+    def post(self, request):
+        try:
+            user = Usermodels.objects.get(id=request.user.id)
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = PostSerializer(data=request.data, context={'request': request})
+
+
+        if serializer.is_valid():
+            post = serializer.save()
+            post_data = PostSerializer(post).data
+            print(post_data)
+            return Response({"message": "Post created successfully.", "posts": post_data}, status=status.HTTP_201_CREATED)
+        
+        # Debugging line to show errors
+        print(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class ArticlePosts(APIView):
+    def post(self, request):
+        try:
+            user = Usermodels.objects.get(id=request.user.id)
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ArticlePost(data=request.data, context={'request': request})
+
+
+        if serializer.is_valid():
+            post = serializer.save()
+            post_data = ArticlePost(post).data
+            print(post_data)
+            return Response({"message": "Post created successfully.", "posts": post_data}, status=status.HTTP_201_CREATED)
+        
+        print(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+
+
+
+    
 
     
     

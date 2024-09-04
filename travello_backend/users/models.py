@@ -7,6 +7,7 @@ from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 
@@ -139,6 +140,24 @@ class Trips(models.Model):
 class Place(models.Model):
     trip = models.ForeignKey(Trips, on_delete=models.CASCADE)
     place_name = models.CharField(max_length=250)
-    description = models.TextField(max_length=500, null=True, blank=True)
+    description = models.TextField(max_length=1000, null=True, blank=True)
     accomodation = models.TextField(max_length=234,null= True,blank = True)
     Transportation = models.TextField(max_length=234,null=True,blank=True)
+
+
+class Post(models.Model):
+    travel_leader = models.ForeignKey(Usermodels, on_delete=models.CASCADE)
+    post_image = models.ImageField(upload_to='media', blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    type_of_trip = models.CharField(blank=True,null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    def __str__(self):
+        return f'Post by {self.travel_leader.username} at {self.created_at}'
+    
+class ArticlePost(models.Model):
+    travel_leader = models.ForeignKey(Usermodels, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(default=timezone.now)
+    article = models.TextField(blank=True, null=True)
+
+
+
