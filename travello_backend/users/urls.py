@@ -31,7 +31,11 @@ urlpatterns = [
     path('viewonetrip/<int:id>/', views.TripDetails.as_view(), name='view_one_trips'),
     path('placedetails/<int:id>/', views.PlaceDetails.as_view(), name='view_places_details'),
     path('posts/', views.PostCreation.as_view(), name='posts'),
-    path('article/', views.ArticlePosts.as_view(), name='posts'),
+    path('article/', views.ArticlePosts.as_view(), name='article'),
+    path('viewposts/', views.ViewPosts.as_view(), name='viewposts'),
+    path('viewusers/', views.ViewUser.as_view(), name='viewposts'),
+
+
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 
 

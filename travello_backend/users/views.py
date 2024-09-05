@@ -2,17 +2,18 @@ from datetime import datetime, timezone
 import json
 from tokenize import TokenError
 from django.shortcuts import render
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place
+from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
-from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticlePost
+from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import update_last_login
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+from django.db.models import Case, When
 
 # Create your views here.
 
@@ -228,8 +229,25 @@ class FormSubmissionView(APIView):
 
 
 class TravelLeaderListView(generics.ListAPIView):
-    queryset = TravelLeaderForm.objects.select_related('user_id')
     serializer_class = FormSubmission
+
+    def get_queryset(self):
+       
+        queryset = TravelLeaderForm.objects.select_related('user_id')
+
+       
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(is_approved=status_filter)
+
+        
+        ordering = Case(
+            When(is_approved='pending', then=0),
+            When(is_approved='accepted', then=1),
+            When(is_approved='rejected', then=2),
+        )
+
+        return queryset.order_by(ordering)
 
 
 
@@ -395,7 +413,7 @@ class UserProfileCreate(APIView):
 
 
 class CreateTrip(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         print(request.data,"hii")
@@ -421,14 +439,14 @@ class ViewTrips(APIView):
         user_id = request.user.id
         print(user_id)
         try:
-            trip = Trips.objects.get(travelead=user_id)
+            trip = Trips.objects.filter(travelead=user_id)
 
             print(trip)
             
         except Trips.DoesNotExist:
             return Response({'error': 'trip not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = TripSerializer(trip)
+        serializer = TripSerializer(trip,many=True,context={'request': request})
         # print(serializer.data)
         return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
      
@@ -500,6 +518,8 @@ class AddPlaces(APIView):
 
 
 class ViewPlaces(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request,id, *args, **kwargs):
         
         # trip_id = request.data.get('tripId')
@@ -522,7 +542,9 @@ class ViewPlaces(APIView):
 
 
 class EditPlace(APIView):
-     def post(self, request, id, *args, **kwargs):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id, *args, **kwargs):
         user_id = request.user.id
         place_name = request.data.get('place_name')
         accommodation = request.data.get('accomodation')
@@ -663,12 +685,12 @@ class ArticlePosts(APIView):
         except Usermodels.DoesNotExist:
             return Response({'error': 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = ArticlePost(data=request.data, context={'request': request})
+        serializer = ArticleSerilizer(data=request.data, context={'request': request})
 
 
         if serializer.is_valid():
             post = serializer.save()
-            post_data = ArticlePost(post).data
+            post_data = ArticleSerilizer(post).data
             print(post_data)
             return Response({"message": "Post created successfully.", "posts": post_data}, status=status.HTTP_201_CREATED)
         
@@ -676,6 +698,49 @@ class ArticlePosts(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+
+
+
+
+class ViewPosts(APIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            
+            user = Usermodels.objects.get(id=request.user.id)
+            
+            try:
+                posts = Post.objects.select_related('travel_leader')
+                article = ArticlePost.objects.select_related('travel_leader')
+                print(article)
+                
+
+                posts_serializer = PostSerializer(posts,many=True,context={'request': request})
+                article_serilizer = ArticleSerilizer(article,many=True)
+                print(posts_serializer.data)
+                return Response({"posts":posts_serializer.data,"article":article_serilizer.data}, status=status.HTTP_200_OK)
+            except Post.DoesNotExist:
+                
+                return Response({"message":"no posts"}, status=status.HTTP_404_NOT_FOUND)
+
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+
+class ViewUser(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    def get(self, request, *args, **kwargs):
+        user_id = request.user.id
+        try:
+            user = Usermodels.objects.get(id = user_id)
+            profile_img = UserProfile.objects.get(user = user)
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+        user_serializer = UserSerializer(user)
+        profile = ProfileSerializer(profile_img)
+        print(user_serializer)
+        return Response({"user":user_serializer.data,"profile":profile.data}, status=status.HTTP_200_OK)
+
+    
 
 
 
