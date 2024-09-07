@@ -33,6 +33,7 @@ class RegisterationApi(APIView):
 
 
 
+
 class VerifyOtp(APIView):
     def post(self,request):
         email = request.data.get('email')
@@ -47,12 +48,7 @@ class VerifyOtp(APIView):
         except Usermodels.DoesNotExist:
             return Response({"error": "User does not exist."}, status=status.HTTP_404_NOT_FOUND)
         
-        now = datetime.now(timezone.utc)
-        if user.is_otpexperied() and now > user.is_otpexperied():
-            user.otp = '' 
-            # user.otp_expiration = None 
-            user.save()
-            return Response({"error": "OTP has expired. Please request a new OTP."}, status=status.HTTP_400_BAD_REQUEST)
+        
         
     
         if user.otp == otp:
@@ -429,7 +425,7 @@ class CreateTrip(APIView):
         if serializer.is_valid():
             trip = serializer.save()
             user_data = TripSerializer(trip).data
-            return Response({"message": "User created successfully. OTP sent.",
+            return Response({"message": "trip created successfully",
                              "user": user_data }, status=status.HTTP_201_CREATED)
         print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -456,10 +452,12 @@ class EditTrips(APIView):
     
     def post(self, request, *args, **kwargs):
         user_id = request.user.id
+        trip_id = request.data.get('id')
+        print(trip_id,"trip-id")
         print(request.data)
         
         try:
-            trips, created = Trips.objects.get_or_create(travelead=user_id)
+            trips, created = Trips.objects.get_or_create(id = trip_id)
         except Trips.DoesNotExist:
             return Response({'error': 'trip not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -511,7 +509,7 @@ class AddPlaces(APIView):
             user_data = PlaceSerializer(trip).data
             return Response({"message": "places added successfully. OTP sent.",
                              "places": user_data }, status=status.HTTP_201_CREATED)
-        print(serializer.errors)
+        # print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
 
 
@@ -595,7 +593,7 @@ class ViewAllTrips(APIView):
 
             try:
                 trip = Trips.objects.select_related('travelead').all()
-                print(trip)
+                # print(trip)
                 
             except Trips.DoesNotExist:
                 return Response({'error': 'trip not found'},status=status.HTTP_404_NOT_FOUND)
@@ -643,7 +641,7 @@ class PlaceDetails(APIView):
 
             try:
                 trip = Place.objects.select_related('trip').filter( trip = id)
-                print(trip)
+                # print(trip)
                 
             except Place.DoesNotExist:
                 return Response({'error': 'trip not found'},status=status.HTTP_404_NOT_FOUND)
@@ -669,7 +667,7 @@ class PostCreation(APIView):
         if serializer.is_valid():
             post = serializer.save()
             post_data = PostSerializer(post).data
-            print(post_data)
+            # print(post_data)
             return Response({"message": "Post created successfully.", "posts": post_data}, status=status.HTTP_201_CREATED)
         
         # Debugging line to show errors
@@ -691,7 +689,7 @@ class ArticlePosts(APIView):
         if serializer.is_valid():
             post = serializer.save()
             post_data = ArticleSerilizer(post).data
-            print(post_data)
+            # print(post_data)
             return Response({"message": "Post created successfully.", "posts": post_data}, status=status.HTTP_201_CREATED)
         
         print(serializer.errors)
@@ -716,8 +714,29 @@ class ViewPosts(APIView):
 
                 posts_serializer = PostSerializer(posts,many=True,context={'request': request})
                 article_serilizer = ArticleSerilizer(article,many=True)
-                print(posts_serializer.data)
+                # print(posts_serializer.data)
                 return Response({"posts":posts_serializer.data,"article":article_serilizer.data}, status=status.HTTP_200_OK)
+            except Post.DoesNotExist:
+                
+                return Response({"message":"no posts"}, status=status.HTTP_404_NOT_FOUND)
+
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+
+class ViewArticle(APIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            
+            user = Usermodels.objects.get(id=request.user.id)
+            
+            try:
+                article = ArticlePost.objects.select_related('travel_leader')
+                print(article)
+                
+
+                article_serilizer = ArticleSerilizer(article,many=True,context={'request': request})
+                # print(posts_serializer.data)
+                return Response({"article":article_serilizer.data,}, status=status.HTTP_200_OK)
             except Post.DoesNotExist:
                 
                 return Response({"message":"no posts"}, status=status.HTTP_404_NOT_FOUND)
@@ -739,6 +758,26 @@ class ViewUser(APIView):
         profile = ProfileSerializer(profile_img)
         print(user_serializer)
         return Response({"user":user_serializer.data,"profile":profile.data}, status=status.HTTP_200_OK)
+    
+# comment and likes section..................
+
+class LikeTravelPostAPIView(APIView):
+    def post(self, request, id):
+        try:
+            post = Post.objects.get(id=id)
+        except Post.DoesNotExist:
+            return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user in post.likes.all():
+            post.likes.remove(request.user)
+            message = "Like removed"
+        else:
+            post.likes.add(request.user)
+            message = "Like added"
+
+        serializer = PostSerializer(post, context={'request': request})
+        return Response({'message': message, 'data': serializer.data,'likes': post.likes.count()}, status=status.HTTP_200_OK)
+
 
     
 

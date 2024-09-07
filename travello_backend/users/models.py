@@ -8,6 +8,8 @@ from django.core.mail import send_mail
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 
 
 
@@ -30,16 +32,15 @@ class Usermodels(AbstractUser):
 
     def generate_otp(self):
         otp = get_random_string(length=6, allowed_chars="1234567890")
-        now = datetime.now(timezone.utc)
         # self.otp_expiration = now + timedelta(seconds=60)
         self.otp = otp
         self.save()
+        self.otp_expiration = timezone.now() + timedelta(seconds=60) 
         self.send_otp_email()
     
-    def is_otpexperied(self):
-        now = datetime.now(timezone.utc)
-        self.otp_expiration = now + timedelta(seconds=60)
-        return datetime.now(timezone.utc) > now + timedelta(seconds=60)
+    def is_otp_expired(self):
+        now = timezone.now()  
+        return now > self.otp_expiration
     
 
     
@@ -151,13 +152,32 @@ class Post(models.Model):
     description = models.TextField(blank=True, null=True)
     type_of_trip = models.CharField(blank=True,null=True)
     created_at = models.DateTimeField(default=timezone.now)
+    likes = models.ManyToManyField(Usermodels, related_name='liked_travel_posts', blank=True)
     def __str__(self):
         return f'Post by {self.travel_leader.username} at {self.created_at}'
+    @property
+    def like_count(self):
+        return self.likes.count()
     
 class ArticlePost(models.Model):
     travel_leader = models.ForeignKey(Usermodels, on_delete=models.CASCADE)
     created_at = models.DateTimeField(default=timezone.now)
     article = models.TextField(blank=True, null=True)
+    likes = models.ManyToManyField(Usermodels, related_name='liked_travel_articles', blank=True)
+    
+    @property
+    def like_count(self):
+        return self.likes.count()
 
+class Comment(models.Model):
+    user = models.ForeignKey(Usermodels, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comment by {self.user.username} on {self.content_type} ID: {self.object_id}"
 
 

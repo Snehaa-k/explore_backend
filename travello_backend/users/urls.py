@@ -34,7 +34,8 @@ urlpatterns = [
     path('article/', views.ArticlePosts.as_view(), name='article'),
     path('viewposts/', views.ViewPosts.as_view(), name='viewposts'),
     path('viewusers/', views.ViewUser.as_view(), name='viewposts'),
-
+    path('viewarticle/', views.ViewArticle.as_view(), name='viewarticle'),
+    path('likeposts/<int:id>/', views.LikeTravelPostAPIView.as_view(), name='like_travel_post'),
 
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 

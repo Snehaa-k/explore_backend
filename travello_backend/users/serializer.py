@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost
+from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -134,12 +134,12 @@ class PlaceSerializer(serializers.ModelSerializer):
     
 class PostSerializer(serializers.ModelSerializer):
     travelead_username = serializers.CharField(source='travel_leader.username', read_only=True)
-
+    total_likes = serializers.IntegerField( read_only=True)
     travelead_profile_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
-        fields = ['id','travel_leader','post_image','description','created_at','travelead_profile_image',"travelead_username"]
+        fields = ['id','travel_leader','post_image','description','created_at','travelead_profile_image',"travelead_username",'likes',"total_likes"]
         read_only_fields = ['id', 'travel_leader', 'created_at']
 
     def create(self, validated_data):
@@ -158,9 +158,10 @@ class PostSerializer(serializers.ModelSerializer):
             user_profile = UserProfile.objects.get(user=obj.travel_leader)
             if user_profile.profile_image:
                 request = self.context.get('request')
-                print(request)
                 
-                return request.build_absolute_uri(user_profile.profile_image.url)
+                
+                if request:
+                    return request.build_absolute_uri(user_profile.profile_image.url)
             return None
         except UserProfile.DoesNotExist:
             return None
@@ -168,10 +169,14 @@ class PostSerializer(serializers.ModelSerializer):
 
 
 class ArticleSerilizer(serializers.ModelSerializer):
+    travelead_username = serializers.CharField(source='travel_leader.username', read_only=True)
+
+    travelead_profile_image = serializers.SerializerMethodField()
     class Meta:
         model = ArticlePost
         fields = '__all__'
         read_only_fields = ['id', 'travel_leader', 'created_at']
+    
     def create(self, validated_data):
         request = self.context.get('request')
         user = request.user
@@ -180,5 +185,31 @@ class ArticleSerilizer(serializers.ModelSerializer):
 
         post = ArticlePost.objects.create(**validated_data)
         return post
-    
+    def get_travelead_profile_image(self,obj):
+        try:
+            print(obj)
+            user_profile = UserProfile.objects.get(user=obj.travel_leader)
+            if user_profile.profile_image:
+                request = self.context.get('request')
+                
+                
+                if request:
+                    return request.build_absolute_uri(user_profile.profile_image.url)
+            return None
+        except UserProfile.DoesNotExist:
+            return None
 
+class CommentSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'user', 'text', 'created_at', 'content_type', 'object_id']
+    def create(self, validated_data):
+        request = self.context.get('request')
+        content_object = validated_data.get('content_object')
+        return Comment.objects.create(
+            user=request.user,
+            content_object=content_object,
+            text=validated_data.get('text')
+        )
