@@ -148,10 +148,26 @@ class PostSerializer(serializers.ModelSerializer):
         user = request.user
 
         validated_data['travel_leader'] = user
+        likes_data = validated_data.pop('likes', None)
+    
+        post = Post.objects.create(**validated_data)
+    
+        if likes_data:
+            post.likes.set(likes_data)  
 
         post = Post.objects.create(**validated_data)
         return post
     
+    # def create(self, validated_data):
+    #     likes_data = validated_data.pop('likes', None)
+    
+    #     post = Post.objects.create(**validated_data)
+    
+    #     if likes_data:
+    #         post.likes.set(likes_data)  
+    #     return post
+    
+   
     def get_travelead_profile_image(self,obj):
         try:
             print(obj)
@@ -182,6 +198,12 @@ class ArticleSerilizer(serializers.ModelSerializer):
         user = request.user
 
         validated_data['travel_leader'] = user
+        likes_data = validated_data.pop('likes', None)
+    
+        # post = ArticlePost.objects.create(**validated_data)
+    
+        if likes_data:
+            post.likes.set(likes_data)  
 
         post = ArticlePost.objects.create(**validated_data)
         return post

@@ -2,14 +2,15 @@ from datetime import datetime, timezone
 import json
 from tokenize import TokenError
 from django.shortcuts import render
-from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost
+from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
-from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer
+from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import update_last_login
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
@@ -714,6 +715,7 @@ class ViewPosts(APIView):
 
                 posts_serializer = PostSerializer(posts,many=True,context={'request': request})
                 article_serilizer = ArticleSerilizer(article,many=True)
+
                 # print(posts_serializer.data)
                 return Response({"posts":posts_serializer.data,"article":article_serilizer.data}, status=status.HTTP_200_OK)
             except Post.DoesNotExist:
@@ -722,6 +724,7 @@ class ViewPosts(APIView):
 
         except Usermodels.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+
 
 class ViewArticle(APIView):
     def get(self, request, *args, **kwargs):
@@ -745,6 +748,8 @@ class ViewArticle(APIView):
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
         
 
+
+
 class ViewUser(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request, *args, **kwargs):
@@ -759,6 +764,7 @@ class ViewUser(APIView):
         print(user_serializer)
         return Response({"user":user_serializer.data,"profile":profile.data}, status=status.HTTP_200_OK)
     
+
 # comment and likes section..................
 
 class LikeTravelPostAPIView(APIView):
@@ -768,7 +774,7 @@ class LikeTravelPostAPIView(APIView):
         except Post.DoesNotExist:
             return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if request.user in post.likes.all():
+        if post.likes.filter(id=request.user.id).exists():
             post.likes.remove(request.user)
             message = "Like removed"
         else:
@@ -776,7 +782,77 @@ class LikeTravelPostAPIView(APIView):
             message = "Like added"
 
         serializer = PostSerializer(post, context={'request': request})
-        return Response({'message': message, 'data': serializer.data,'likes': post.likes.count()}, status=status.HTTP_200_OK)
+        likes_count = post.likes.count()
+        print(likes_count)
+        return Response({'message': message, 'data': serializer.data,'likes':likes_count}, status=status.HTTP_200_OK)
+
+
+
+
+class LikeArticleView(APIView):
+    def post(self, request, id):
+        try:
+            article = ArticlePost.objects.get(id=id)
+        except ArticlePost.DoesNotExist:
+            return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if article.likes.filter(id=request.user.id).exists():
+            article.likes.remove(request.user)
+            message = "Like removed"
+        else:
+            article.likes.add(request.user)
+            message = "Like added"
+
+        serializer = PostSerializer(article, context={'request': request})
+        likes_count = article.likes.count()
+        print(likes_count)
+        return Response({'message': message, 'data': serializer.data,'likes':likes_count}, status=status.HTTP_200_OK)
+
+
+# comment section.................
+
+class CommentCreateView(generics.CreateAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]  
+
+    def create(self, request, *args, **kwargs):
+        content_type = request.data.get('content_type')
+        object_id = request.data.get('object_id')
+        text = request.data.get('text')
+
+        try:
+            content_type_obj = ContentType.objects.get(id=content_type)
+        except ContentType.DoesNotExist:
+            return Response({"error": "Invalid content type"}, status=status.HTTP_400_BAD_REQUEST)
+
+        comment = Comment.objects.create(
+            user=request.user,
+            content_type=content_type_obj,
+            object_id=object_id,
+            text=text,
+        )
+
+        serializer = self.get_serializer(comment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class CommentListView(generics.ListAPIView):
+    serializer_class = CommentSerializer
+
+    def get_queryset(self):
+        content_type = self.request.query_params.get('content_type')
+        object_id = self.request.query_params.get('object_id')
+
+        try:
+            content_type_obj = ContentType.objects.get(id=content_type)
+        except ContentType.DoesNotExist:
+            return Comment.objects.none()
+
+        return Comment.objects.filter(content_type=content_type_obj, object_id=object_id)
+
+
+
 
 
     
