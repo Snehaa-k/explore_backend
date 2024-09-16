@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from tokenize import TokenError
 from django.shortcuts import render
-from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment
+from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
@@ -15,6 +15,13 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from django.db.models import Case, When
+from django.utils.dateparse import parse_date
+from django.conf import settings
+import stripe
+from django.utils import timezone
+
+# stripe.api_key = settings.STRIPE_SECRET_KEY
+
 
 # Create your views here.
 
@@ -420,23 +427,37 @@ class CreateTrip(APIView):
         
         except Usermodels.DoesNotExist:
             return Response({'error': 'not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        new_trip_start_date = parse_date(request.data.get('start_date'))
+        existing_trips = Trips.objects.filter(travelead=user).order_by('-end_date')
+        if existing_trips.exists():
+            last_trip = existing_trips.first()
+            if new_trip_start_date >= last_trip.end_date:
+                # return Response({'error': 'New trip start date must be after the last trip\'s end date'},
+                #                 status=status.HTTP_400_BAD_REQUEST)
+        
+                serializer = TripSerializer(data=request.data,context={'request': request})
 
-        serializer = TripSerializer(data=request.data,context={'request': request})
+                if serializer.is_valid():
+                    trip = serializer.save()
+                    user_data = TripSerializer(trip).data
+                    return Response({"message": "Trip created successfully",
+                                    "user": user_data }, status=status.HTTP_201_CREATED)
+                # print(serializer.errors)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'New trip start date must be after the last trip\'s end date'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if serializer.is_valid():
-            trip = serializer.save()
-            user_data = TripSerializer(trip).data
-            return Response({"message": "trip created successfully",
-                             "user": user_data }, status=status.HTTP_201_CREATED)
-        print(serializer.errors)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
 
 class ViewTrips(APIView):
      def get(self, request, *args, **kwargs):
         user_id = request.user.id
         print(user_id)
+        today = timezone.now().date()
         try:
-            trip = Trips.objects.filter(travelead=user_id)
+            trip = Trips.objects.filter(travelead=user_id,end_date__gt = today)
 
             print(trip)
             
@@ -591,9 +612,11 @@ class ViewAllTrips(APIView):
         except Usermodels.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
         if user:
+            today = timezone.now().date()
+            tomorrow = today + timedelta(days=1)
 
             try:
-                trip = Trips.objects.select_related('travelead').all()
+                trip = Trips.objects.select_related('travelead').filter(end_date__gt = today,start_date__gt=tomorrow)
                 # print(trip)
                 
             except Trips.DoesNotExist:
@@ -671,7 +694,6 @@ class PostCreation(APIView):
             # print(post_data)
             return Response({"message": "Post created successfully.", "posts": post_data}, status=status.HTTP_201_CREATED)
         
-        # Debugging line to show errors
         print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -850,6 +872,83 @@ class CommentListView(generics.ListAPIView):
             return Comment.objects.none()
 
         return Comment.objects.filter(content_type=content_type_obj, object_id=object_id)
+
+
+
+class CreateStripeSessionAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            # Ensure user is authenticated
+            user = request.user
+            if not user:
+                return Response({'error': 'User is not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get the user and trip
+            user_id = Usermodels.objects.get(id=user.id)
+            trip_id = request.data.get('trip_id')
+            if not trip_id:
+                return Response({'error': 'trip_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+
+            
+            trip = Trips.objects.get(id=trip_id)
+            amount = int(trip.amount * 100)  
+            
+            if trip.participant_limit <=0: 
+                return Response({'error': 'No available spots for this trip'}, status=status.HTTP_400_BAD_REQUEST)
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'inr',
+                        'product_data': {
+                            'name': f'Advance Payment for {trip.location}',
+                        },
+                        'unit_amount': amount,
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                customer_email=user_id.email,
+                success_url='http://localhost:5173/success',
+                cancel_url='http://localhost:5173/cancel',
+            )
+            
+            
+
+
+            if session.success_url:
+                    Payment.objects.create(
+                        user=user,
+                        trip=trip,
+                        amount=amount / 100,
+                        status='completed'
+                    )
+                    trip.participant_limit=trip.participant_limit-1
+                    trip.save()
+
+
+            return Response({'sessionId': session.id}, status=status.HTTP_200_OK)
+
+        except Trips.DoesNotExist:
+            return Response({'error': 'Trip not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        except stripe.error.StripeError as e:
+            return Response({'error': f'Stripe error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            return Response({'error': f'Internal server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
+class TripsByLeaderView(generics.ListAPIView):
+    serializer_class = TripSerializer
+
+    def get_queryset(self):
+        leader_id = self.kwargs['id']
+        Payment.objects.filter()
+        return Trips.objects.filter(travelead=leader_id)   
+
 
 
 

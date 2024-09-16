@@ -14,8 +14,14 @@ from datetime import timedelta
 import os
 from pathlib import Path
 
+import stripe
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+stripe.api_key = "sk_test_51PxSrYJiQplpQ67p21wG491FMYwDtlhX8d6JWe7OgakQ92cZ0p2hDIbpmdj7Ntn08gfsWvztx7AZFAgoHwR8Njkn00Wbe1VDAg"
+STRIPE_PUBLISHABLE_KEY = "pk_test_51PxSrYJiQplpQ67p3kTF3bBrVzigdJZPFHmLiY67aVcv66vff1cTyW4g9NCtjn1ZCbiMVi23UmvSyflOGJiiejIF005mqPKxuk"
 
 
 # Quick-start development settings - unsuitable for production

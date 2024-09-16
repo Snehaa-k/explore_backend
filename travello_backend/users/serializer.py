@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment
+from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -76,11 +76,31 @@ class FormSubmission(serializers.ModelSerializer):
         instance.visited_countries.set(selected_countries)
         return instance
     
+
+class PaymentSerializer(serializers.ModelSerializer):
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = [
+            'id',
+            'user',
+            'trip',
+            'amount',
+            'status',
+            'created_at',
+            'updated_at',
+            'user_username',
+            'user_email',
+        ]
+    
+
 class TripSerializer(serializers.ModelSerializer):
     travelead_username = serializers.CharField(source='travelead.username', read_only=True)
     travelead_email = serializers.CharField(source='travelead.email', read_only=True)
-
-    
+   
+    booked_customers = PaymentSerializer(many=True, read_only=True, source='payment_set')
     travelead_profile_image = serializers.SerializerMethodField()
     class Meta:
         model = Trips
@@ -100,6 +120,8 @@ class TripSerializer(serializers.ModelSerializer):
             'amount', 
             'participant_limit' ,
             'travelead_profile_image' ,
+            'booked_customers',
+            'is_completed',
         ]
     def create(self, validated_data):
         request = self.context.get('request')
@@ -235,3 +257,5 @@ class CommentSerializer(serializers.ModelSerializer):
             content_object=content_object,
             text=validated_data.get('text')
         )
+
+
