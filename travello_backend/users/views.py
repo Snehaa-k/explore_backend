@@ -420,32 +420,38 @@ class CreateTrip(APIView):
     # permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        print(request.data,"hii")
-        print(request.user.id)
+        print(request.data, "Received Data")
+        print(request.user.id, "User ID")
+
         try:
-            user = Usermodels.objects.get(id = request.user.id)
-        
+            user = Usermodels.objects.get(id=request.user.id)
         except Usermodels.DoesNotExist:
-            return Response({'error': 'not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
         new_trip_start_date = parse_date(request.data.get('start_date'))
+
+       
         existing_trips = Trips.objects.filter(travelead=user).order_by('-end_date')
+
         if existing_trips.exists():
             last_trip = existing_trips.first()
-            if new_trip_start_date >= last_trip.end_date:
-                # return Response({'error': 'New trip start date must be after the last trip\'s end date'},
-                #                 status=status.HTTP_400_BAD_REQUEST)
-        
-                serializer = TripSerializer(data=request.data,context={'request': request})
+            
+            if new_trip_start_date <= last_trip.end_date:
+                return Response({'error': 'New trip start date must be after the last trip\'s end date'},
+                                status=status.HTTP_400_BAD_REQUEST)
 
-                if serializer.is_valid():
-                    trip = serializer.save()
-                    user_data = TripSerializer(trip).data
-                    return Response({"message": "Trip created successfully",
-                                    "user": user_data }, status=status.HTTP_201_CREATED)
-                # print(serializer.errors)
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            return Response({'error': 'New trip start date must be after the last trip\'s end date'}, status=status.HTTP_400_BAD_REQUEST)
+       
+        serializer = TripSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+           
+            trip = serializer.save()
+            trip_data = TripSerializer(trip).data
+            return Response({"message": "Trip created successfully", "trip": trip_data}, 
+                            status=status.HTTP_201_CREATED)
+
+       
+        print(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -538,7 +544,7 @@ class AddPlaces(APIView):
 
 
 class ViewPlaces(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request,id, *args, **kwargs):
         
@@ -922,7 +928,8 @@ class CreateStripeSessionAPIView(APIView):
                         user=user,
                         trip=trip,
                         amount=amount / 100,
-                        status='completed'
+                        status='ongoing',
+                        payment_type = 'stripe'
                     )
                     trip.participant_limit=trip.participant_limit-1
                     trip.save()
@@ -946,8 +953,78 @@ class TripsByLeaderView(generics.ListAPIView):
 
     def get_queryset(self):
         leader_id = self.kwargs['id']
-        Payment.objects.filter()
         return Trips.objects.filter(travelead=leader_id)   
+
+
+class FollowUserView(APIView):
+    
+    def post(self, request,id):
+        user = request.user
+        try:
+            profile = UserProfile.objects.get(user = id)
+            
+            if profile.followers.filter(id=request.user.id).exists():
+                profile.followers.remove(request.user)
+                return Response({'message': 'Unfollowed successfully'}, status=status.HTTP_200_OK)
+            else:
+                profile.followers.add(request.user)
+                return Response({'message': 'Followed successfully'}, status=status.HTTP_200_OK)
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    def get(self, request,id):
+        user = request.user
+        try:
+            profile = UserProfile.objects.get(user=id)
+            
+            
+            is_following = profile.followers.filter(id=user.id).exists()
+            
+            total_followers = profile.followers.count()
+            
+            return Response({
+                'is_following': is_following,
+                'total_followers': total_followers,
+            }, status=status.HTTP_200_OK)
+        
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ShowBookedTrip(APIView):
+    
+    def get(self, request):
+        user = request.user  
+
+        payments = Payment.objects.filter(user=user)
+
+        if payments.exists():
+            booked_trips = []
+
+            for payment in payments:
+                trip = payment.trip
+                image_url = trip.Trip_image.url if trip.Trip_image else ''
+
+                booked_trips.append({
+                    'id': trip.id,
+                    'name': trip.location,
+                    'destination': trip.location,
+                    'start_date': trip.start_date,
+                    'end_date': trip.end_date,
+                    'status': payment.status,
+                    'image_url':image_url,
+                })
+
+            return Response({'booked_trips': booked_trips}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'No booked trips found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+
+
+
+
 
 
 

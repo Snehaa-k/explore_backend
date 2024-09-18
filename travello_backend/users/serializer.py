@@ -90,7 +90,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'amount',
             'status',
             'created_at',
-            'updated_at',
+           
             'user_username',
             'user_email',
         ]
@@ -102,6 +102,8 @@ class TripSerializer(serializers.ModelSerializer):
    
     booked_customers = PaymentSerializer(many=True, read_only=True, source='payment_set')
     travelead_profile_image = serializers.SerializerMethodField()
+    travelead_bio = serializers.SerializerMethodField()
+    travelead_address = serializers.SerializerMethodField()
     class Meta:
         model = Trips
         fields = [
@@ -122,7 +124,13 @@ class TripSerializer(serializers.ModelSerializer):
             'travelead_profile_image' ,
             'booked_customers',
             'is_completed',
+            'travelead',
+            'travelead_bio',
+            'travelead_address',
         ]
+        extra_kwargs = {
+            'travelead': {'read_only': True}  
+        }
     def create(self, validated_data):
         request = self.context.get('request')
         user = request.user
@@ -142,6 +150,20 @@ class TripSerializer(serializers.ModelSerializer):
                 if request:
                     return request.build_absolute_uri(user_profile.profile_image.url)
             return None
+        except UserProfile.DoesNotExist:
+            return None
+    
+    def get_travelead_bio(self, obj):
+        try:
+            user_profile = UserProfile.objects.get(user=obj.travelead)
+            return user_profile.bio if user_profile.bio else None
+        except UserProfile.DoesNotExist:
+            return None
+    
+    def get_travelead_address(self, obj):
+        try:
+            user_profile = UserProfile.objects.get(user=obj.travelead)
+            return user_profile.address if user_profile.address else None
         except UserProfile.DoesNotExist:
             return None
 
@@ -172,7 +194,7 @@ class PostSerializer(serializers.ModelSerializer):
         validated_data['travel_leader'] = user
         likes_data = validated_data.pop('likes', None)
     
-        post = Post.objects.create(**validated_data)
+        # post = Post.objects.create(**validated_data)
     
         if likes_data:
             post.likes.set(likes_data)  
@@ -245,10 +267,17 @@ class ArticleSerilizer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
-
+    profile_image = serializers.SerializerMethodField()
     class Meta:
         model = Comment
-        fields = ['id', 'user', 'text', 'created_at', 'content_type', 'object_id']
+        fields = ['id', 'user', 'text', 'created_at', 'content_type', 'object_id','profile_image']
+
+    def get_profile_image(self, obj):
+        request = self.context.get('request')
+        if hasattr(obj.user, 'profile_image') and obj.user.profile_image:
+            return request.build_absolute_uri(obj.user.profile_image.url)
+        return None
+    
     def create(self, validated_data):
         request = self.context.get('request')
         content_object = validated_data.get('content_object')

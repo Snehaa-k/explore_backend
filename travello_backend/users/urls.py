@@ -41,6 +41,8 @@ urlpatterns = [
     path('commentview/', views.CommentListView.as_view(), name='comment_view'),
     path('create-checkout-session/' , views.CreateStripeSessionAPIView.as_view(),name='checkout'),  
     path('adminviewtrip/<int:id>/' , views.TripsByLeaderView.as_view(),name='tripbyleaderview'),  
+    path('follow/<int:id>', views.FollowUserView.as_view(), name='follow_user'),
+    path('showbookedtrip/', views.ShowBookedTrip.as_view(), name='show_booked_trip'),
 
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 

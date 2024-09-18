@@ -65,6 +65,7 @@ class UserProfile(models.Model):
     address = models.TextField(max_length=345)
     bio = models.CharField(max_length=234,null=True)
     country_state = models.CharField(max_length=234,null=True)
+    followers = models.ManyToManyField(Usermodels, related_name='following', blank=True)
     
     def __str__(self):
         return f"{self.user.username} - Profile"
@@ -184,18 +185,15 @@ class Comment(models.Model):
 
 
 class Payment(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
-    ]
+    
     
     user = models.ForeignKey(Usermodels, on_delete=models.CASCADE)
     trip = models.ForeignKey(Trips, on_delete=models.CASCADE)  
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=10, default='ongoing')
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    payment_type = models.CharField(max_length=255)
+
 
     def __str__(self):
         return f"Payment of {self.amount} by {self.user.username} for {self.trip.location} - {self.status}"
