@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment
+from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -286,5 +286,10 @@ class CommentSerializer(serializers.ModelSerializer):
             content_object=content_object,
             text=validated_data.get('text')
         )
+
+class WalletSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Wallet
+        fields = ['user', 'wallet'] 
 
 

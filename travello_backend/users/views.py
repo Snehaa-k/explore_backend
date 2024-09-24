@@ -2,11 +2,11 @@ from datetime import datetime, timedelta, timezone
 import json
 from tokenize import TokenError
 from django.shortcuts import render
-from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment
+from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
-from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer
+from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer,WalletSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import update_last_login
@@ -20,6 +20,7 @@ from django.conf import settings
 import stripe
 from django.utils import timezone
 
+
 # stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
@@ -29,9 +30,10 @@ class RegisterationApi(APIView):
     def post(self, request):
         print(request.data)
         serializer = UserSerializer(data=request.data)
-
+        
         if serializer.is_valid():
             user = serializer.save()
+            Wallet.objects.create(user=user, wallet=0)
             user_data = UserSerializer(user).data
             return Response({"message": "User created successfully. OTP sent.",
                              "user": user_data }, status=status.HTTP_201_CREATED)
@@ -656,7 +658,7 @@ class TripDetails(APIView):
 
         
         serializer = TripSerializer(trip,context={'request': request})
-        return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({'trip':serializer.data,'userId':user_id}, status=status.HTTP_201_CREATED)
 
     
 class PlaceDetails(APIView):
@@ -916,23 +918,23 @@ class CreateStripeSessionAPIView(APIView):
                 }],
                 mode='payment',
                 customer_email=user_id.email,
-                success_url='http://localhost:5173/success',
+                success_url=f'http://localhost:5173/success?session_id={{CHECKOUT_SESSION_ID}}&trip_id={trip_id}',
                 cancel_url='http://localhost:5173/cancel',
             )
             
             
 
 
-            if session.success_url:
-                    Payment.objects.create(
-                        user=user,
-                        trip=trip,
-                        amount=amount / 100,
-                        status='ongoing',
-                        payment_type = 'stripe'
-                    )
-                    trip.participant_limit=trip.participant_limit-1
-                    trip.save()
+            # if session.id:
+            #         Payment.objects.create(
+            #             user=user,
+            #             trip=trip,
+            #             amount=amount / 100,
+            #             status='ongoing',
+            #             payment_type = 'stripe'
+            #         )
+            #         trip.participant_limit=trip.participant_limit-1
+            #         trip.save()
 
 
             return Response({'sessionId': session.id}, status=status.HTTP_200_OK)
@@ -945,6 +947,48 @@ class CreateStripeSessionAPIView(APIView):
 
         except Exception as e:
             return Response({'error': f'Internal server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+#confirmation payment
+class ConfirmPaymentAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        session_id = request.data.get('session_id')
+        trip_id = request.data.get('trip_id')
+        if not session_id:
+            return Response({'error': 'session_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+            print(session)
+
+            if session:
+                trip = Trips.objects.get(id=trip_id)
+                print(trip)
+                user = request.user
+
+               
+                Payment.objects.create(
+                    user=user,
+                    trip=trip,
+                    amount=session.amount_total / 100, 
+                    status='completed',
+                    payment_type='stripe'
+                )
+
+               
+                trip.participant_limit -= 1
+                trip.save()
+
+                return Response({'success': True}, status=status.HTTP_200_OK)
+
+            return Response({'error': 'Payment not successful'}, status=status.HTTP_400_BAD_REQUEST)
+
+        except stripe.error.StripeError as e:
+            return Response({'error': f'Stripe error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         
 
 
@@ -1018,14 +1062,117 @@ class ShowBookedTrip(APIView):
             return Response({'booked_trips': booked_trips}, status=status.HTTP_200_OK)
         else:
             return Response({'error': 'No booked trips found'}, status=status.HTTP_404_NOT_FOUND)
+        
+
+class FollowingTravelLeadersView(APIView):
+    def get(self, request):
+        user = request.user
+        try:
+            
+            profile = UserProfile.objects.get(user=user)
+
+            followed_profiles = profile.followers.all()
+            print(followed_profiles)
 
 
+            leaders_data = []
+            for leader in followed_profiles:
+                
+                leaders_data.append({
+                    # 'id':leader.user.id,
+                    # 'username': leader.user.username,
+                   
+                    'profile_image': leader.profile_image.url ,
+                })
+
+            total_following = followed_profiles.count()
+
+            return Response({
+                'followed_travel_leaders': leaders_data,
+                'total_following': total_following
+            }, status=status.HTTP_200_OK)
+
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
+class CancelTrip(APIView):
+    def post(self, request):
+        user = request.user
+        trip_id = request.data.get('trip_id')
+        try:
+            cancel = Payment.objects.get(user = user)
+            trip = Trips.objects.get(id = trip_id)
+            wallet = Wallet.objects.get(user = user)
+            trip.participant_limit = trip.participant_limit+1
+            wallet.wallet = trip.amount
+            wallet.save()
+            trip.save()
+             
+            cancel.status = "cancelled"
+           
+            cancel.save()
+
+            
+            
+        except Payment.DoesNotExist:
+            return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+class ShowWallet(APIView):
+    def get(self, request):
+        user = request.user
+        try:
+            
+            wallet = Wallet.objects.get(user=user)
+
+        except Wallet.DoesNotExist:
+            return Response({'error': 'wallet not found'}, status=status.HTTP_404_NOT_FOUND)
+        user_serializer = WalletSerializer(wallet)
+        return Response({"wallet":user_serializer.data}, status=status.HTTP_200_OK)
 
 
+class WalletPayment(APIView):
+    def post(self, request, *args, **kwargs):
+        trip_id = request.data.get('trip_id')
+        
+        if not trip_id:
+            return Response({'error': 'trip_id is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        try:
+            trip = Trips.objects.get(id=trip_id)
+            user = request.user
 
+            wallet = Wallet.objects.get(user=user)
+            trip_cost = trip.amount
+
+            if wallet.wallet >= trip_cost:
+                wallet.wallet -= trip_cost
+                wallet.save()
+
+                Payment.objects.create(
+                    user=user,
+                    trip=trip,
+                    amount=trip_cost,  
+                    status='completed',
+                    payment_type='wallet'
+                )
+
+                trip.participant_limit -= 1
+                trip.save()
+
+                return Response({'success': True, 'message': 'Payment completed using wallet'}, status=status.HTTP_200_OK)
+
+            else:
+                return Response({'error': 'Insufficient wallet balance'}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Trips.DoesNotExist:
+            return Response({'error': 'Trip not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        except Wallet.DoesNotExist:
+            return Response({'error': 'Wallet not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 

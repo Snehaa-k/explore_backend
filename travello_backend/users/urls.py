@@ -43,6 +43,11 @@ urlpatterns = [
     path('adminviewtrip/<int:id>/' , views.TripsByLeaderView.as_view(),name='tripbyleaderview'),  
     path('follow/<int:id>', views.FollowUserView.as_view(), name='follow_user'),
     path('showbookedtrip/', views.ShowBookedTrip.as_view(), name='show_booked_trip'),
+    path('following-leaders/', views.FollowingTravelLeadersView.as_view(), name='show_booked_trip'),
+    path('confirm-payment/', views.ConfirmPaymentAPIView.as_view(), name='confirm_payment'),
+    path('canceltrip/', views.CancelTrip.as_view(), name='canceltrip'),
+    path('showwallet/', views.ShowWallet.as_view(), name='wallet'),
+    path('wallet_payment/', views.WalletPayment.as_view(), name='wallet_pay'),
 
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 
