@@ -1,70 +1,90 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import ChatMessage,Usermodels
+from urllib.parse import urlparse, parse_qs
+import json
+from .models import ChatMessages,Usermodels
 from asgiref.sync import sync_to_async
 
 class TravelChat(AsyncWebsocketConsumer):
     async def connect(self):
-        self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.room_group_name = f'chat_{self.room_name}'
+        query_string = self.scope.get('query_string', b'').decode('utf-8')
+        query_params = parse_qs(query_string)
 
-        # Join room group
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+        if query_params.get('receiver_id', [None])[0] == "null":
+            self.room_group_name = None
+        else:
+            try:
+                user_id = int(query_params.get('user_id', [None])[0])
+                receiver_id = int(query_params.get('receiver_id', [None])[0])
 
-        await self.accept()
+                if user_id > receiver_id:
+                    self.room_name = f'{user_id}_{receiver_id}'
+                else:
+                    self.room_name = f'{receiver_id}_{user_id}'
 
-    async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+                self.room_group_name = 'chat_%s' % self.room_name
 
-    async def receive(self, text_data):
-        data = json.loads(text_data)
-        message = data.get('message')
-        sender_id = data.get('sender_id') 
-        receiver_id = data.get('receiver_id')  
-        # Save message to database
-        await self.save_message(sender_id, receiver_id, message)
+                await self.channel_layer.group_add(
+                    self.room_group_name,
+                    self.channel_name
+                )
+                await self.accept()
 
-        # Send message to room group
+                # Send a JSON message indicating successful connection
+                await self.send(text_data=json.dumps({
+                    'type': 'connection',
+                    'room_group_name': self.room_group_name
+                }))
+            except (TypeError, IndexError):
+                await self.close(code=4000)
+
+    async def receive(self, text_data=None, bytes_data=None):
+        text_data_json = json.loads(text_data)
+        message = text_data_json['message']
+        userId = text_data_json['sender_id']
+        receiver_id = text_data_json['receiver_id']
+        
+        await self.save_message(userId, receiver_id, message, self.room_group_name)
+        
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 'type': 'chat_message',
                 'message': message,
-                'sender_id': sender_id,
-                
+                'sender': userId,
+                'receiver': receiver_id
             }
         )
 
     async def chat_message(self, event):
-        message = event['message']
-        sender_id = event['sender_id']
-
-        # Send message to WebSocket
+        content = event['message']
+        sender = event['sender']
+        receiver = event['receiver']
+        
         await self.send(text_data=json.dumps({
-            'message': message,
-            'sender_id': sender_id,
+            'type': 'chat_message',
+            'content': content,
+            'sender': sender,
+            'receiver': receiver
         }))
 
+
     @database_sync_to_async
-    def save_message(self, sender_id, receiver_id, message):
+    def save_message(self, sender, receiver, message,thread):
+        
         try:
-            sender = Usermodels.objects.get(id=sender_id)
+            sender = Usermodels.objects.get(id=sender)
+            print(sender)
         except Usermodels.DoesNotExist:
-            print(f"Sender with ID {sender_id} does not exist")
+            print(f"Sender with ID {sender} does not exist")
           
         try:
-            receiver = Usermodels.objects.get(id=receiver_id)
+            receiver = Usermodels.objects.get(id=receiver)
         except Usermodels.DoesNotExist:
-            print(f"Receiver with ID {receiver_id} does not exist")
+            print(f"Receiver with ID {receiver} does not exist")
             return
-        ChatMessage.objects.create(sender=sender, receiver=receiver, message=message)
+        ChatMessages.objects.create(sender = sender.id,receiver = receiver.id,content = message,thread_name= thread) 
+
 
   

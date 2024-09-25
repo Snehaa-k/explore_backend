@@ -199,14 +199,12 @@ class Payment(models.Model):
         return f"Payment of {self.amount} by {self.user.username} for {self.trip.location} - {self.status}"
     
 
-class ChatMessage(models.Model):
-    sender = models.ForeignKey(Usermodels, related_name='sent_messages', on_delete=models.CASCADE)
-    receiver = models.ForeignKey(Usermodels, related_name='received_messages', on_delete=models.CASCADE)
-    message = models.TextField()
+class ChatMessages(models.Model):
+    sender = models.IntegerField(null=True,blank= True)
+    receiver = models.IntegerField(null=True,blank= True)
+    content = models.TextField()
+    thread_name = models.CharField(max_length=30,null= True,blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.sender.username} to {self.receiver.username}: {self.message[:50]}"
 
 
 class Wallet(models.Model):

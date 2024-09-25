@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet
+from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet,ChatMessages
+from django.db.models import Q
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -291,5 +292,40 @@ class WalletSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wallet
         fields = ['user', 'wallet'] 
+
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChatMessages
+        fields = ['sender', 'receiver', 'content', 'timestamp']
+
+
+
+
+class ChatPartnerSerializer(serializers.ModelSerializer):
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Usermodels
+        fields = ['id', 'username', 'last_message']
+
+    def get_last_message(self, obj):
+        user = self.context['request'].user 
+        last_message = ChatMessages.objects.filter(
+            (Q(sender=user.id) & Q(receiver=obj.id)) | (Q(sender=obj.id) & Q(receiver=user.id))
+        ).order_by('-timestamp').first() 
+
+        if last_message:
+            return ChatMessageSerializer(last_message).data  
+        return None  
+
+
+
+
+
+
+
+
+        
 
 

@@ -2,11 +2,11 @@ from datetime import datetime, timedelta, timezone
 import json
 from tokenize import TokenError
 from django.shortcuts import render
-from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet
+from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet,ChatMessages
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
-from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer,WalletSerializer
+from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer,WalletSerializer,ChatPartnerSerializer,ChatMessageSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import update_last_login
@@ -634,7 +634,7 @@ class ViewAllTrips(APIView):
 
         
         serializer = TripSerializer(trip,many=True,context={'request': request})
-        return Response({'trip':serializer.data}, status=status.HTTP_201_CREATED)
+        return Response({'trip':serializer.data,'user':user.id}, status=status.HTTP_201_CREATED)
 
 
 class TripDetails(APIView):
@@ -1064,36 +1064,36 @@ class ShowBookedTrip(APIView):
             return Response({'error': 'No booked trips found'}, status=status.HTTP_404_NOT_FOUND)
         
 
-class FollowingTravelLeadersView(APIView):
-    def get(self, request):
-        user = request.user
-        try:
+# class FollowingTravelLeadersView(APIView):
+#     def get(self, request):
+#         user = request.user
+#         try:
             
-            profile = UserProfile.objects.get(user=user)
+#             profile = UserProfile.objects.get(user=user)
 
-            followed_profiles = profile.followers.all()
-            print(followed_profiles)
+#             followed_profiles = profile.followers.all()
+#             print(followed_profiles)
 
 
-            leaders_data = []
-            for leader in followed_profiles:
+#             leaders_data = []
+#             for leader in followed_profiles:
                 
-                leaders_data.append({
-                    # 'id':leader.user.id,
-                    # 'username': leader.user.username,
+#                 leaders_data.append({
+#                     # 'id':leader.user.id,
+#                     # 'username': leader.user.username,
                    
-                    'profile_image': leader.profile_image.url ,
-                })
+#                     'profile_image': leader.profile_image.url ,
+#                 })
 
-            total_following = followed_profiles.count()
+#             total_following = followed_profiles.count()
 
-            return Response({
-                'followed_travel_leaders': leaders_data,
-                'total_following': total_following
-            }, status=status.HTTP_200_OK)
+#             return Response({
+#                 'followed_travel_leaders': leaders_data,
+#                 'total_following': total_following
+#             }, status=status.HTTP_200_OK)
 
-        except UserProfile.DoesNotExist:
-            return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
+#         except UserProfile.DoesNotExist:
+#             return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class CancelTrip(APIView):
@@ -1173,6 +1173,36 @@ class WalletPayment(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class ChatPartnersView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChatPartnerSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        # Get all unique chat partner IDs where the user is either the sender or receiver
+        sender_ids = ChatMessages.objects.filter(sender=user.id).values_list('receiver', flat=True)
+        receiver_ids = ChatMessages.objects.filter(receiver=user.id).values_list('sender', flat=True)
+
+        # Combine both lists and get unique IDs
+        chat_partners_ids = set(sender_ids) | set(receiver_ids)  # Use set union to avoid duplicates
+
+        return Usermodels.objects.filter(id__in=chat_partners_ids) 
+
+
+class MessageListView(generics.ListAPIView):
+    serializer_class = ChatMessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        current_user = self.request.user.id
+        receiver_id = self.kwargs['receiver_id']
+        # Fetch messages between the current user and the specified receiver
+        return ChatMessages.objects.filter(
+            (Q(sender=current_user) & Q(receiver=receiver_id)) |
+            (Q(receiver=current_user) & Q(sender=receiver_id))
+        ).order_by('timestamp')
 
 
 
