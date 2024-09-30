@@ -18,7 +18,9 @@ from django.db.models import Case, When
 from django.utils.dateparse import parse_date
 from django.conf import settings
 import stripe
+from django.core.mail import send_mail
 from django.utils import timezone
+from rest_framework.decorators import api_view
 
 
 # stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -160,7 +162,7 @@ class CustomTokenObtainPairView(APIView):
         try:
             user = Usermodels.objects.get(email=email)
         except Usermodels.DoesNotExist:
-            return Response({'error': 'User not found or invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'error': ' Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
         
         if not check_password(password, user.password):
@@ -300,7 +302,7 @@ class RejectTravelLeaderView(APIView):
         
         form.is_approved = "rejected"
         form.save()
-        user.is_approve_leader=True
+        user.is_approve_leader=False
         user.save()
       
         return Response({'status': 'Rejected'}, status=status.HTTP_200_OK)
@@ -510,7 +512,25 @@ class EditTrips(APIView):
         trips.duration = duration
         trips.start_date = start_date
         trips.amount = amount
+
+        if start_date and duration:
+            try:
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
+                
+                end_date = start_date_obj + timedelta(days=int(duration))
+                
+                trips.start_date = start_date_obj
+                trips.end_date = end_date
+            except ValueError:
+                return Response({"error": "Invalid date or duration format"}, status=status.HTTP_400_BAD_REQUEST)        
+       
+
+        # image_file = request.FILES.get('image')
+        # if image_file:
+        #     trips.Trip_image = image_file
+
         trips.save()
+
         
         if created:
             message = "trip created successfully"
@@ -654,11 +674,16 @@ class TripDetails(APIView):
             except Trips.DoesNotExist:
                 return Response({'error': 'trip not found'},status=status.HTTP_404_NOT_FOUND)
             
-        
-
+           
+            is_booked = False  # Default to not booked
+        try:
+            payment = Payment.objects.get(user=user, trip=trip)
+            is_booked = payment.status == 'completed'  
+        except Payment.DoesNotExist:
+            pass
         
         serializer = TripSerializer(trip,context={'request': request})
-        return Response({'trip':serializer.data,'userId':user_id}, status=status.HTTP_201_CREATED)
+        return Response({'trip':serializer.data,'userId':user_id,'is_booked': is_booked}, status=status.HTTP_201_CREATED)
 
     
 class PlaceDetails(APIView):
@@ -1104,6 +1129,8 @@ class CancelTrip(APIView):
             cancel = Payment.objects.get(user = user)
             trip = Trips.objects.get(id = trip_id)
             wallet = Wallet.objects.get(user = user)
+            if timezone.now() >= trip.end_date - timedelta(days=2):
+                return Response({'message': 'You can only cancel the trip at least 2 days before the end date.'}, status=status.HTTP_400_BAD_REQUEST)
             trip.participant_limit = trip.participant_limit+1
             wallet.wallet = trip.amount
             wallet.save()
@@ -1112,11 +1139,12 @@ class CancelTrip(APIView):
             cancel.status = "cancelled"
            
             cancel.save()
-
+            return Response({'message': 'Trip cancelled successfully.'}, status=status.HTTP_200_OK)
             
             
+        
         except Payment.DoesNotExist:
-            return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'payement not found'}, status=status.HTTP_404_NOT_FOUND)
 
 class ShowWallet(APIView):
     def get(self, request):
@@ -1145,25 +1173,38 @@ class WalletPayment(APIView):
             wallet = Wallet.objects.get(user=user)
             trip_cost = trip.amount
 
-            if wallet.wallet >= trip_cost:
+            existing_payment = Payment.objects.filter(user=user, trip=trip).first()
+
+            if existing_payment:
+                existing_payment.status = 'completed'  
+                existing_payment.payment_type = 'wallet'  
+                existing_payment.save()
+
+                if wallet.wallet < trip_cost:
+                    return Response({'error': 'Insufficient wallet balance'}, status=status.HTTP_400_BAD_REQUEST)
+
                 wallet.wallet -= trip_cost
                 wallet.save()
 
-                Payment.objects.create(
-                    user=user,
-                    trip=trip,
-                    amount=trip_cost,  
-                    status='completed',
-                    payment_type='wallet'
-                )
-
-                trip.participant_limit -= 1
-                trip.save()
-
-                return Response({'success': True, 'message': 'Payment completed using wallet'}, status=status.HTTP_200_OK)
-
             else:
-                return Response({'error': 'Insufficient wallet balance'}, status=status.HTTP_400_BAD_REQUEST)
+                if wallet.wallet >= trip_cost:
+                    wallet.wallet -= trip_cost
+                    wallet.save()
+
+                    Payment.objects.create(
+                        user=user,
+                        trip=trip,
+                        amount=trip_cost,  
+                        status='completed',
+                        payment_type='wallet'
+                    )
+                else:
+                    return Response({'error': 'Insufficient wallet balance'}, status=status.HTTP_400_BAD_REQUEST)
+
+            trip.participant_limit -= 1
+            trip.save()
+
+            return Response({'success': True, 'message': 'Payment completed using wallet'}, status=status.HTTP_200_OK)
 
         except Trips.DoesNotExist:
             return Response({'error': 'Trip not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -1173,7 +1214,6 @@ class WalletPayment(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
 
 class ChatPartnersView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -1181,12 +1221,10 @@ class ChatPartnersView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        # Get all unique chat partner IDs where the user is either the sender or receiver
         sender_ids = ChatMessages.objects.filter(sender=user.id).values_list('receiver', flat=True)
         receiver_ids = ChatMessages.objects.filter(receiver=user.id).values_list('sender', flat=True)
 
-        # Combine both lists and get unique IDs
-        chat_partners_ids = set(sender_ids) | set(receiver_ids)  # Use set union to avoid duplicates
+        chat_partners_ids = set(sender_ids) | set(receiver_ids) 
 
         return Usermodels.objects.filter(id__in=chat_partners_ids) 
 
@@ -1204,6 +1242,95 @@ class MessageListView(generics.ListAPIView):
             (Q(receiver=current_user) & Q(sender=receiver_id))
         ).order_by('timestamp')
 
+
+class TripDetailsTravelLeaders(APIView):
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        print(user.id)
+        try:
+            trip = Trips.objects.prefetch_related('payment_set').filter(travelead=user.id)  
+            serializer = TripSerializer(trip,many=True,context={'request': request})
+           
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Trips.DoesNotExist:
+            return Response({'error': 'Trip not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+class CancelTripLeader(APIView):
+    def post(self, request, id, *args, **kwargs):
+        try:
+            # Get the trip by id
+            trip = Trips.objects.filter(id=id).first()
+
+            # Check if trip exists
+            if not trip:
+                return Response({"error": "Trip not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            trip.is_completed = "cancelled"
+            trip.save()
+
+            trip_amount = trip.amount
+            print(trip_amount,"amount printed")
+
+            booked_customers = Payment.objects.filter(trip=id)
+            print(booked_customers,"bookinfg")
+
+            if not booked_customers.exists():
+                return Response({"message": "No customers booked for this trip"}, status=status.HTTP_200_OK)
+
+            for payment in booked_customers:
+                
+                payment.status = "trip_cancelled"
+                payment.save()
+
+                
+                wallet = Wallet.objects.get(user=payment.user)
+                print(wallet,"hai wallet")
+
+                if wallet:
+                    wallet.wallet += trip_amount  
+                    wallet.save()
+
+                    
+                    send_mail(
+                        subject='Trip Cancellation Notice',
+                        message=f'Dear {payment.user.username},\n\nThe trip you booked has been cancelled due to unforeseen circumstances. '
+                                f'We apologize for any inconvenience caused. The amount has been refunded to your wallet.\n\nBest regards,\nYour Travel Team',
+                        from_email=settings.EMAIL_HOST_USER,
+                        recipient_list=[payment.user.email],
+                        fail_silently=False,
+                    )
+                else:
+                    return Response({"message": f"Wallet not found for user {payment.user.email}"}, status=status.HTTP_200_OK)
+
+            return Response({"message": "Trip marked as cancelled, funds returned to wallets, and emails sent"}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def mark_all_messages_as_read(request):
+    # Get the partner ID from the request data
+    partner_id = request.data.get('partner_id')
+    current_user_id = request.user.id  # Assuming you have user authentication set up
+
+    if not partner_id:
+        return Response({'error': 'Partner ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Mark all unread messages as read for the current user and the selected partner
+        ChatMessages.objects.filter(
+            sender=partner_id,  # Assuming sender_id refers to the chat partner
+            receiver=current_user_id,  # Assuming receiver_id refers to the logged-in user
+            is_read=False  # Only target unread messages
+        ).update(is_read=True)
+
+        return Response({'message': 'All unread messages marked as read.'}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 

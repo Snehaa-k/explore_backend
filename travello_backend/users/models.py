@@ -88,6 +88,10 @@ class TravelLeaderForm(models.Model):
     cv = models.FileField(upload_to='cv', blank=True, null=True)
     id_proof = models.FileField(upload_to='id_proof', blank=True, null=True)
     is_approved = models.CharField(max_length=254,default="pending") 
+    bank_account_name = models.CharField(max_length=255, null=True, blank=True)  
+    bank_account_number = models.CharField(max_length=50, null=True, blank=True)  
+    bank_name = models.CharField(max_length=255, null=True, blank=True)  
+    ifsc_code = models.CharField(max_length=20, null=True, blank=True)  
     def __str__(self):
         return f"{self.user_id.username}'s Travel Leader Profile"
 
@@ -190,7 +194,7 @@ class Payment(models.Model):
     user = models.ForeignKey(Usermodels, on_delete=models.CASCADE)
     trip = models.ForeignKey(Trips, on_delete=models.CASCADE)  
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=10, default='Ongoing')
+    status = models.CharField(max_length=355, default='Ongoing')
     created_at = models.DateTimeField(auto_now_add=True)
     payment_type = models.CharField(max_length=255)
 
@@ -205,6 +209,7 @@ class ChatMessages(models.Model):
     content = models.TextField()
     thread_name = models.CharField(max_length=30,null= True,blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
 
 
 class Wallet(models.Model):
@@ -212,6 +217,17 @@ class Wallet(models.Model):
     wallet = models.IntegerField(default=0)
     def __str__(self):
         return f"{self.user.username}'s Wallet: {self.wallet}"
+    
+
+class Notification(models.Model):
+    sender = models.ForeignKey(Usermodels,on_delete=models.CASCADE,blank=True,null=True,related_name="notification_sender")
+    receiver = models.ForeignKey(Usermodels,on_delete=models.CASCADE,blank=True,null=True,related_name='notification_reciever')
+    message = models.TextField()  
+    created_at = models.DateTimeField(auto_now_add=True)  
+    is_read = models.BooleanField(default=False)  
+
+    class Meta:
+        ordering = ['-created_at']
 
 
 

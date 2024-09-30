@@ -91,7 +91,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'amount',
             'status',
             'created_at',
-           
+            'payment_type',
             'user_username',
             'user_email',
         ]
@@ -297,17 +297,19 @@ class WalletSerializer(serializers.ModelSerializer):
 class ChatMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatMessages
-        fields = ['sender', 'receiver', 'content', 'timestamp']
+        fields = ['sender', 'receiver', 'content', 'timestamp','is_read']
 
 
 
 
 class ChatPartnerSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+    
 
     class Meta:
         model = Usermodels
-        fields = ['id', 'username', 'last_message']
+        fields = ['id', 'username', 'last_message','unread_count']
 
     def get_last_message(self, obj):
         user = self.context['request'].user 
@@ -317,7 +319,17 @@ class ChatPartnerSerializer(serializers.ModelSerializer):
 
         if last_message:
             return ChatMessageSerializer(last_message).data  
-        return None  
+        return None 
+    
+    def get_unread_count(self, obj):
+        user = self.context['request'].user
+        # Count unread messages sent from the partner to the current user
+        unread_count = ChatMessages.objects.filter(
+            receiver=user.id,
+            sender=obj.id,
+            is_read=False
+        ).count()
+        return unread_count 
 
 
 

@@ -1,5 +1,6 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.layers import get_channel_layer
 from channels.db import database_sync_to_async
 from urllib.parse import urlparse, parse_qs
 import json
@@ -17,6 +18,8 @@ class TravelChat(AsyncWebsocketConsumer):
             try:
                 user_id = int(query_params.get('user_id', [None])[0])
                 receiver_id = int(query_params.get('receiver_id', [None])[0])
+                unread_count = await self.get_unread_messages_count(user_id)
+                
 
                 if user_id > receiver_id:
                     self.room_name = f'{user_id}_{receiver_id}'
@@ -36,6 +39,11 @@ class TravelChat(AsyncWebsocketConsumer):
                     'type': 'connection',
                     'room_group_name': self.room_group_name
                 }))
+
+                await self.send(text_data=json.dumps({
+                    'type': 'unread_count',
+                    'unread_count': unread_count
+                            }))
             except (TypeError, IndexError):
                 await self.close(code=4000)
 
@@ -44,6 +52,8 @@ class TravelChat(AsyncWebsocketConsumer):
         message = text_data_json['message']
         userId = text_data_json['sender_id']
         receiver_id = text_data_json['receiver_id']
+        sender_username = await self.get_username(userId)
+
         
         await self.save_message(userId, receiver_id, message, self.room_group_name)
         
@@ -56,6 +66,19 @@ class TravelChat(AsyncWebsocketConsumer):
                 'receiver': receiver_id
             }
         )
+        print('in chat')
+        await self.channel_layer.group_send(
+            f"notification_{receiver_id}",
+            {
+                'type' : 'send_notification',
+                "data":{
+                   'message':message,
+                   'user':sender_username
+                   
+                }
+            }
+        )
+    
 
     async def chat_message(self, event):
         content = event['message']
@@ -69,6 +92,31 @@ class TravelChat(AsyncWebsocketConsumer):
             'receiver': receiver
         }))
 
+    
+       
+        # if str(self.scope['user'].id) != str(sender):  # Notify only the receiver, not the sender
+        #         await self.send(text_data=json.dumps({
+        #             'type': 'notification',
+        #             'content': f'New message from {sender}: {content}',
+        #             'sender': sender,
+        #             'receiver': receiver
+        #         }))
+    @database_sync_to_async
+    def get_username(self, user_id):
+        try:
+            user = Usermodels.objects.get(id=user_id)
+            return user.username
+        except Usermodels.DoesNotExist:
+            return f"User {user_id}"
+   
+    @database_sync_to_async
+    def get_unread_messages_count(self, user_id):
+        return ChatMessages.objects.filter(receiver=user_id, is_read=False).count()
+    
+    @database_sync_to_async
+    def mark_messages_as_read(self, user_id, room_group_name):
+        ChatMessages.objects.filter(receiver=user_id, thread_name=room_group_name, is_read=False).update(is_read=True)
+    
 
     @database_sync_to_async
     def save_message(self, sender, receiver, message,thread):
@@ -76,6 +124,7 @@ class TravelChat(AsyncWebsocketConsumer):
         try:
             sender = Usermodels.objects.get(id=sender)
             print(sender)
+            
         except Usermodels.DoesNotExist:
             print(f"Sender with ID {sender} does not exist")
           
@@ -84,7 +133,51 @@ class TravelChat(AsyncWebsocketConsumer):
         except Usermodels.DoesNotExist:
             print(f"Receiver with ID {receiver} does not exist")
             return
-        ChatMessages.objects.create(sender = sender.id,receiver = receiver.id,content = message,thread_name= thread) 
+        ChatMessages.objects.create(sender = sender.id,receiver = receiver.id,content = message,thread_name= thread,is_read=False) 
 
+
+
+
+
+
+
+class NotificationConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        query_params = dict(parse_qs(self.scope['query_string'].decode()))
+        try:
+            user_id = int(query_params.get('user_id', [None])[0])
+            self.room_name = f'{user_id}_room'
+            self.room_group_name = f'notification_{user_id}'
+       
+        # Join room group
+            await self.channel_layer.group_add(
+                self.room_group_name,
+                self.channel_name
+            )
+            print("Socket connected for user:", user_id, self.room_group_name,self.channel_name)
+            print(f"User {user_id} connected to notification group {self.room_group_name}")
+            await self.accept()
+        except (ValueError, TypeError) as e:
+            await self.close(code=4000)
+            self.room_group_name = None
+
+    async def disconnect(self, close_code):
+        # Check if the group exists before trying to discard
+        if hasattr(self, 'room_group_name') and self.room_group_name:
+            # Leave room group
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+            print("Socket disconnected")
+        else:
+            print("No room group to disconnect from")
+
+    async def send_notification(self, event):
+        # notification = event['notification']
+        print(event,"haiiillllllllllllllllllllllllllllllllllllllllll")
+        # timestamp = event.get('timestamp', None)  
+
+        await self.send(text_data=json.dumps(event["data"]))
 
   

@@ -49,7 +49,9 @@ urlpatterns = [
     path('wallet_payment/', views.WalletPayment.as_view(), name='wallet_pay'),
     path('chat-partners/', views.ChatPartnersView.as_view(), name='chat-partners'),
     path('messages/<int:receiver_id>/', views.MessageListView.as_view(), name='message-list'),
-
+    path('trip_details/', views.TripDetailsTravelLeaders.as_view(), name='trip-details'),
+    path('trip_cancel/<int:id>', views.CancelTripLeader.as_view(), name='trip-cancel'),
+    path('mark-all-messages-as-read/', views.mark_all_messages_as_read, name='mark_all_messages_as_read'),
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 
 
