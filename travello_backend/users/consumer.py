@@ -53,6 +53,7 @@ class TravelChat(AsyncWebsocketConsumer):
         userId = text_data_json['sender_id']
         receiver_id = text_data_json['receiver_id']
         sender_username = await self.get_username(userId)
+        uread_count = await self.get_unread_messages_count(userId)
 
         
         await self.save_message(userId, receiver_id, message, self.room_group_name)
@@ -73,7 +74,8 @@ class TravelChat(AsyncWebsocketConsumer):
                 'type' : 'send_notification',
                 "data":{
                    'message':message,
-                   'user':sender_username
+                   'user':sender_username,
+                   'unread_count':uread_count,
                    
                 }
             }
@@ -113,6 +115,8 @@ class TravelChat(AsyncWebsocketConsumer):
     def get_unread_messages_count(self, user_id):
         return ChatMessages.objects.filter(receiver=user_id, is_read=False).count()
     
+    
+
     @database_sync_to_async
     def mark_messages_as_read(self, user_id, room_group_name):
         ChatMessages.objects.filter(receiver=user_id, thread_name=room_group_name, is_read=False).update(is_read=True)

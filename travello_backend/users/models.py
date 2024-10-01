@@ -139,7 +139,8 @@ class Trips(models.Model):
     transportation =  models.CharField(max_length=345)
     amount =  models.IntegerField()
     participant_limit = models.IntegerField()
-    is_completed = models.CharField(max_length=254,default="pending") 
+    is_completed = models.CharField(max_length=254,default="pending")
+    is_refund = models.CharField(default="false")
     def __str__(self):
         return f"{self.location} - {self.trip_type} by {self.travelead.username}"
 

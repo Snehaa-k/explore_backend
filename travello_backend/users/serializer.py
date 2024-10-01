@@ -63,7 +63,7 @@ class FormSubmission(serializers.ModelSerializer):
 
     class Meta:
         model = TravelLeaderForm
-        fields = ['id', 'visited_countries', 'firstname', 'lastname', 'cv', 'id_proof', 'is_approved', 'mobile', 'user_id','selectedCountries']
+        fields = ['id', 'visited_countries', 'firstname', 'lastname', 'cv', 'id_proof', 'is_approved', 'mobile', 'user_id','selectedCountries','bank_account_name','bank_account_number','bank_name','ifsc_code']
 
     def create(self, validated_data):
         selected_countries = validated_data.pop('visited_countries', [])
@@ -128,6 +128,7 @@ class TripSerializer(serializers.ModelSerializer):
             'travelead',
             'travelead_bio',
             'travelead_address',
+            'is_refund'
         ]
         extra_kwargs = {
             'travelead': {'read_only': True}  

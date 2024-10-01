@@ -206,6 +206,12 @@ class FormSubmissionView(APIView):
         mobile = request.data.get('mobile')
         cv_file = request.FILES.get('cvFile')
         id_file = request.FILES.get('idFile')
+        accountHolder = request.data.get('accountHolder')
+        accountNumber = request.data.get('accountNumber')
+        bankName = request.data.get('bankName')
+        ifscCode = request.data.get('ifscCode')
+
+         
         
         try:
             user_id = Usermodels.objects.get(email=user)
@@ -224,7 +230,11 @@ class FormSubmissionView(APIView):
             email=user,
             mobile=mobile,
             cv=cv_file,
-            id_proof=id_file
+            id_proof=id_file,
+            bank_account_name = accountHolder,
+            bank_account_number = accountNumber,
+            bank_name = bankName,
+            ifsc_code = ifscCode
 
         )
         for country_name in visited_countries:
@@ -1333,7 +1343,35 @@ def mark_all_messages_as_read(request):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Refund.................
+class RefundAPIView(APIView):
+    def post(self, request, id):
+        print(id,"haii")
+        try:
+           
+            trip = Trips.objects.get(id = id)
+            if trip.is_refund:
+                return Response({"message": "Trip has already been refunded."}, status=status.HTTP_400_BAD_REQUEST)
 
+            
+            booked_customers = Payment.objects.get(trip=id).count()
+
+            refund_amount = trip.amount * booked_customers
+
+           
+
+            trip.is_refund = True
+            trip.save()
+
+            return Response({
+                "message": "Refund successful.",
+                "refunded_amount": refund_amount
+            }, status=status.HTTP_200_OK)
+
+        except Trips.DoesNotExist:
+            return Response({"error": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     
 

@@ -52,6 +52,7 @@ urlpatterns = [
     path('trip_details/', views.TripDetailsTravelLeaders.as_view(), name='trip-details'),
     path('trip_cancel/<int:id>', views.CancelTripLeader.as_view(), name='trip-cancel'),
     path('mark-all-messages-as-read/', views.mark_all_messages_as_read, name='mark_all_messages_as_read'),
+    path('refund/<int:id>', views.RefundAPIView.as_view(), name='refund'),
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 
 
