@@ -53,6 +53,20 @@ urlpatterns = [
     path('trip_cancel/<int:id>', views.CancelTripLeader.as_view(), name='trip-cancel'),
     path('mark-all-messages-as-read/', views.mark_all_messages_as_read, name='mark_all_messages_as_read'),
     path('refund/<int:id>', views.RefundAPIView.as_view(), name='refund'),
+    path('fetchposts/', views.ViewPostsTravelleader.as_view(), name='posts'),
+    path(
+        "notification/",
+        views.NotificationViewSet.as_view({"get": "list"}),
+        name="notification",
+    ),
+    path(
+        "notification/<int:id>",
+        views.NotificationViewSet.as_view({"delete": "destroy"}),
+        name="notification",
+    ),
+    path("mark_as_read/<int:id>",views.NotificationViewSet.as_view({"post": "mark_as_read"}), name="mark_as_read"),
+    path("mark_all_as_read", views.NotificationViewSet.as_view({"post": "mark_all_as_read"}), name="mark_all_as_read"),
+
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 
 

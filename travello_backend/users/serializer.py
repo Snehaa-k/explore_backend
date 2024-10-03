@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet,ChatMessages
+from .models import Notification, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet,ChatMessages
 from django.db.models import Q
 
 class UserSerializer(serializers.ModelSerializer):
@@ -331,6 +331,21 @@ class ChatPartnerSerializer(serializers.ModelSerializer):
             is_read=False
         ).count()
         return unread_count 
+    
+
+class NotificationSerializer(serializers.ModelSerializer):
+   
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "sender",
+            "text",
+            "link",
+            "is_read",
+            "created_at",
+            "notification_type",
+        ]
 
 
 

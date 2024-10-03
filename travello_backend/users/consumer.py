@@ -4,7 +4,7 @@ from channels.layers import get_channel_layer
 from channels.db import database_sync_to_async
 from urllib.parse import urlparse, parse_qs
 import json
-from .models import ChatMessages,Usermodels
+from .models import ChatMessages, Notification,Usermodels
 from asgiref.sync import sync_to_async
 
 class TravelChat(AsyncWebsocketConsumer):
@@ -184,4 +184,15 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
         await self.send(text_data=json.dumps(event["data"]))
 
-  
+@database_sync_to_async
+def create_notification(sender, receiver, notification_type, text, link=None):
+   
+    
+    return Notification.objects.create(
+        sender=sender,
+        receiver=receiver,
+        notification_type=notification_type,
+        text=text,
+        link=link,
+        seen=False,
+    )

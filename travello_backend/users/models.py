@@ -220,15 +220,34 @@ class Wallet(models.Model):
         return f"{self.user.username}'s Wallet: {self.wallet}"
     
 
+
+
 class Notification(models.Model):
-    sender = models.ForeignKey(Usermodels,on_delete=models.CASCADE,blank=True,null=True,related_name="notification_sender")
-    receiver = models.ForeignKey(Usermodels,on_delete=models.CASCADE,blank=True,null=True,related_name='notification_reciever')
-    message = models.TextField()  
-    created_at = models.DateTimeField(auto_now_add=True)  
-    is_read = models.BooleanField(default=False)  
+   
+    NOTIFICATION_TYPES = (
+        ("message", "Message"),
+        ("trip_edited", "Trip is Edited"),
+        ("new_trip_created", "New Trip is Created"),
+        ("follow", "Follow"),
+        ("user_is_booked", "User is Booked"),
+       
+    )
+    sender = models.ForeignKey(
+        Usermodels, on_delete=models.CASCADE, related_name="sent_notifications", null=True
+    )
+    receiver = models.ForeignKey(
+        Usermodels, on_delete=models.CASCADE, related_name="notifications", null=True
+    )
+    notification_type = models.CharField(
+        max_length=50, choices=NOTIFICATION_TYPES, null=True
+    )
+    text = models.TextField(null=True)
+    link = models.CharField(max_length=255, null=True, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
-
-
+    def __str__(self) -> str:
+        return f"Notification for {self.receiver.username} from {self.sender.username}: {self.text}"

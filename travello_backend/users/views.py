@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta, timezone
 import json
 from tokenize import TokenError
+from urllib import response
 from django.shortcuts import render
-from .models import Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet,ChatMessages
+from .models import Notification, Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet,ChatMessages
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
-from .serializer import UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer,WalletSerializer,ChatPartnerSerializer,ChatMessageSerializer
+from .serializer import NotificationSerializer, UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer,WalletSerializer,ChatPartnerSerializer,ChatMessageSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import update_last_login
@@ -21,7 +22,10 @@ import stripe
 from django.core.mail import send_mail
 from django.utils import timezone
 from rest_framework.decorators import api_view
-
+from rest_framework import generics, response, status, views, viewsets
+from rest_framework.decorators import action
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 # stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -442,33 +446,59 @@ class CreateTrip(APIView):
         except Usermodels.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Parse the new trip start date from the request
         new_trip_start_date = parse_date(request.data.get('start_date'))
 
-       
+        # Check if the new trip start date is after the last trip's end date
         existing_trips = Trips.objects.filter(travelead=user).order_by('-end_date')
-
         if existing_trips.exists():
             last_trip = existing_trips.first()
-            
             if new_trip_start_date <= last_trip.end_date:
                 return Response({'error': 'New trip start date must be after the last trip\'s end date'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-       
         serializer = TripSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-           
             trip = serializer.save()
             trip_data = TripSerializer(trip).data
-            return Response({"message": "Trip created successfully", "trip": trip_data}, 
-                            status=status.HTTP_201_CREATED)
 
-       
+            user_profile = UserProfile.objects.get(user=user)
+            followers = user_profile.followers.all()  
+
+            for follower in followers:
+                notification_type = "new_trip"
+                text = f"{user.username} has created a new trip."
+                link = f"/viewdestination/{trip.id}" 
+
+                Notification.objects.create(
+                    receiver=follower,
+                    sender=user,
+                    notification_type=notification_type,
+                    text=text,
+                    link=link,
+                    is_read=False,
+                )
+
+                # Send the notification via WebSocket (if needed)
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"notification_{follower.id}",
+                    {
+                        "type": "send_notification",
+                        "data": {
+                            "type": notification_type,
+                            "sender": user.username,
+                            "text": text,
+                            "link": link,
+                        },
+                    },
+                )
+
+            return Response({"message": "Trip created successfully", "trip": trip_data}, status=status.HTTP_201_CREATED)
+
+        # If there are errors in the serializer, return them
         print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
 
 
 class ViewTrips(APIView):
@@ -496,7 +526,6 @@ class EditTrips(APIView):
         user_id = request.user.id
         trip_id = request.data.get('id')
         print(trip_id,"trip-id")
-        print(request.data)
         
         try:
             trips, created = Trips.objects.get_or_create(id = trip_id)
@@ -535,9 +564,10 @@ class EditTrips(APIView):
                 return Response({"error": "Invalid date or duration format"}, status=status.HTTP_400_BAD_REQUEST)        
        
 
-        # image_file = request.FILES.get('image')
-        # if image_file:
-        #     trips.Trip_image = image_file
+        image_file = request.FILES.get('Trip_image', None)
+        print(image_file,"image")
+        if image_file:
+            trips.Trip_image = image_file
 
         trips.save()
 
@@ -685,7 +715,7 @@ class TripDetails(APIView):
                 return Response({'error': 'trip not found'},status=status.HTTP_404_NOT_FOUND)
             
            
-            is_booked = False  # Default to not booked
+            is_booked = False  
         try:
             payment = Payment.objects.get(user=user, trip=trip)
             is_booked = payment.status == 'completed'  
@@ -1040,6 +1070,7 @@ class FollowUserView(APIView):
     def post(self, request,id):
         user = request.user
         try:
+            users = Usermodels.objects.get(id = request.user.id)
             profile = UserProfile.objects.get(user = id)
             
             if profile.followers.filter(id=request.user.id).exists():
@@ -1047,7 +1078,38 @@ class FollowUserView(APIView):
                 return Response({'message': 'Unfollowed successfully'}, status=status.HTTP_200_OK)
             else:
                 profile.followers.add(request.user)
+                receiver = Usermodels.objects.get(id=id)
+
+                notification_type = "follow"
+                text = f"{users.username} started following you"
+                link = f"/travellerprofile"
+                sender = user
+
+                Notification.objects.create(
+                    receiver=receiver,
+                    sender=sender,
+                    notification_type=notification_type,
+                    text=text,
+                    link=link,
+                    is_read=False,
+                )
+
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"notification_{id}",
+                    {
+                        "type": "send_notification",
+                        "data": {
+                            "type": notification_type,
+                            "sender": profile.user.username,
+                            "text": text,
+                            "link": link,
+                        },
+                    },
+                )
                 return Response({'message': 'Followed successfully'}, status=status.HTTP_200_OK)
+            
+        
         except UserProfile.DoesNotExist:
             return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
     
@@ -1350,13 +1412,18 @@ class RefundAPIView(APIView):
         try:
            
             trip = Trips.objects.get(id = id)
-            if trip.is_refund:
+            print(trip)
+            if trip.is_refund == True:
                 return Response({"message": "Trip has already been refunded."}, status=status.HTTP_400_BAD_REQUEST)
 
             
-            booked_customers = Payment.objects.get(trip=id).count()
-
-            refund_amount = trip.amount * booked_customers
+            booked_customers = Payment.objects.filter(trip=id)
+            print(booked_customers,"haii")
+            sum = 0
+            for i in booked_customers:
+                sum = sum+1
+            print(booked_customers)
+            refund_amount = trip.amount * sum
 
            
 
@@ -1374,7 +1441,71 @@ class RefundAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     
+class ViewPostsTravelleader(APIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            user = Usermodels.objects.get(id=request.user.id)
+            
+            try:
+                posts = Post.objects.filter(travel_leader=user).select_related('travel_leader')
+                articles = ArticlePost.objects.filter(travel_leader=user).select_related('travel_leader')
+                post_content_type = ContentType.objects.get_for_model(Post)
+                post_ids = posts.values_list('id', flat=True)
 
+                posts_serializer = PostSerializer(posts, many=True, context={'request': request})
+                article_serializer = ArticleSerilizer(articles, many=True)
+                post_comments = Comment.objects.filter(
+                    content_type=post_content_type, object_id__in=post_ids, user=request.user
+                )
+                notification_count = Notification.objects.filter(receiver=request.user.id,is_read = False).count()
+                post_comments_serializer = CommentSerializer(post_comments, many=True)
+                print(post_comments)
+                
+                return Response({
+                    "posts": posts_serializer.data,
+                    "articles": article_serializer.data,
+                    "post_comments": post_comments_serializer.data,
+                    "notification_count":notification_count
+                }, status=status.HTTP_200_OK)
+
+            except Post.DoesNotExist:
+                return Response({"message": "no posts"}, status=status.HTTP_404_NOT_FOUND)
+
+        except Usermodels.DoesNotExist:
+            return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+  
+    serializer_class = NotificationSerializer
+    lookup_field = "id"
+
+    def get_queryset(self):
+        return Notification.objects.filter(receiver=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def mark_as_read(self, request, id=None):
+      
+        notification = Notification.objects.get(id=id)
+        notification.is_read = True
+        notification.save()
+        return response.Response(data="notification", status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"])
+    def mark_all_as_read(self, request):
+       
+        notification = self.get_queryset()
+        notification.update(is_read=True)
+        return response.Response(
+            data="All notification marked as read", status=status.HTTP_200_OK
+        )
+
+    def destroy(self, request, id):
+       
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
 
 
 
