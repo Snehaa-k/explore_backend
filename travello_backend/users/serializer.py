@@ -22,12 +22,19 @@ class UserSerializer(serializers.ModelSerializer):
         user = Usermodels.objects.create_user(**validated_data)
         user.generate_otp()
         return user
+    
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        if password is not None:
+            instance.set_password(password) 
+        return super().update(instance, validated_data)
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
     class Meta:
         model = UserProfile
-        fields = ['id','profile_image','address','bio','country_state','user']
+        fields = ['id','profile_image','address','bio','country_state','user','username']
 
 
 class CountryField(serializers.PrimaryKeyRelatedField):
@@ -173,7 +180,7 @@ class TripSerializer(serializers.ModelSerializer):
 class PlaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Place
-        fields = ['id', 'trip', 'place_name', 'description', 'accomodation','Transportation']
+        fields = ['id', 'trip', 'place_name', 'description', 'accomodation','Transportation','place_image']
     
     
     

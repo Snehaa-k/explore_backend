@@ -53,6 +53,7 @@ urlpatterns = [
     path('trip_cancel/<int:id>', views.CancelTripLeader.as_view(), name='trip-cancel'),
     path('mark-all-messages-as-read/', views.mark_all_messages_as_read, name='mark_all_messages_as_read'),
     path('refund/<int:id>', views.RefundAPIView.as_view(), name='refund'),
+    path('following-leaders/', views.Followviewtravellers.as_view(), name='following'),
     path('fetchposts/', views.ViewPostsTravelleader.as_view(), name='posts'),
     path(
         "notification/",
@@ -66,6 +67,9 @@ urlpatterns = [
     ),
     path("mark_as_read/<int:id>",views.NotificationViewSet.as_view({"post": "mark_as_read"}), name="mark_as_read"),
     path("mark_all_as_read", views.NotificationViewSet.as_view({"post": "mark_all_as_read"}), name="mark_all_as_read"),
+    path("forgot-password/", views.PasswordResetRequestView.as_view(), name="forgot_password"),
+    path("password-reset/", views.PasswordResetConfirmView.as_view(), name="password_confirm"),
+    path("edit-post-view/<int:id>/", views.EditPostAPIView.as_view(), name="edit-post"),
 
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 

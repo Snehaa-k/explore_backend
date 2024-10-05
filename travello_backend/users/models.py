@@ -1,6 +1,7 @@
 from datetime import datetime, timezone,timedelta
 from django.db import models
-
+from datetime import timedelta
+import uuid
 # Create your models here.
 from django.contrib.auth.models import AbstractUser,Group,Permission
 from django.utils.crypto import get_random_string
@@ -24,6 +25,8 @@ class Usermodels(AbstractUser):
     is_verified = models.BooleanField(default=False)
     is_approve_leader = models.BooleanField(default=False)
     user_preference = models.CharField(max_length=254,null = True)
+    reset_token = models.CharField(max_length=100, blank=True, null=True)
+    token_expiration = models.DateTimeField(blank=True, null=True)
     groups = models.ManyToManyField(Group, related_name='custom_user_groups')
     user_permissions = models.ManyToManyField(Permission, related_name='custom_user_permissions')
 
@@ -50,6 +53,12 @@ class Usermodels(AbstractUser):
         from_email = "worldmagical491@gmail.com" 
         to_email = [self.email]
         send_mail(subject, message, from_email, to_email)
+    
+    def create_reset_token(self):
+        """Generates a reset token and expiration time."""
+        self.reset_token = uuid.uuid4().hex
+        self.token_expiration = timezone.now() + timedelta(hours=1)  
+        self.save()
 
    
 
@@ -147,6 +156,8 @@ class Trips(models.Model):
 
 class Place(models.Model):
     trip = models.ForeignKey(Trips, on_delete=models.CASCADE)
+    place_image = models.ImageField(upload_to='media', blank=True, null=True)
+
     place_name = models.CharField(max_length=250)
     description = models.TextField(max_length=1000, null=True, blank=True)
     accomodation = models.TextField(max_length=234,null= True,blank = True)

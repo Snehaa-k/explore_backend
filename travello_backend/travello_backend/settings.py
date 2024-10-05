@@ -118,6 +118,8 @@ CORS_ALLOW_METHODS = [
 
 # AUTH_USER_MODEL = 'home.Usermodelss'
 
+FRONTEND_URL = 'http://localhost:5173'
+
 ROOT_URLCONF = 'travello_backend.urls'
 
 TEMPLATES = [
