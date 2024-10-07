@@ -150,6 +150,7 @@ class Trips(models.Model):
     participant_limit = models.IntegerField()
     is_completed = models.CharField(max_length=254,default="pending")
     is_refund = models.CharField(default="false")
+    is_group = models.CharField(default="false")
     def __str__(self):
         return f"{self.location} - {self.trip_type} by {self.travelead.username}"
 
@@ -262,3 +263,41 @@ class Notification(models.Model):
 
     def __str__(self) -> str:
         return f"Notification for {self.receiver.username} from {self.sender.username}: {self.text}"
+    
+
+
+class Group(models.Model):
+    trip = models.ForeignKey(Trips, on_delete=models.CASCADE) 
+    members = models.ManyToManyField(Usermodels, through='GroupMember') 
+    created_at = models.DateTimeField(auto_now_add=True) 
+
+    def __str__(self):
+        return f"Group for {self.trip.title}"
+
+class GroupMember(models.Model):
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)  
+    user = models.ForeignKey(Usermodels, on_delete=models.CASCADE) 
+    joined_at = models.DateTimeField(auto_now_add=True)  
+    class Meta:
+        unique_together = (('group', 'user'),)  
+
+    def __str__(self):
+        return f"{self.user.username} in {self.group.trip.title}"
+    
+
+class GroupChat(models.Model):
+    group =  models.ForeignKey(Group, on_delete=models.CASCADE) 
+    trip = models.ForeignKey(Trips, on_delete=models.CASCADE)  
+    sender = models.ForeignKey(Usermodels, on_delete=models.CASCADE)  
+    content = models.TextField()  
+    timestamp = models.DateTimeField(auto_now_add=True)  
+
+
+class UserReport(models.Model):
+    reporter = models.ForeignKey(Usermodels, on_delete=models.CASCADE, related_name="reports_made")
+    reported_user = models.ForeignKey(Usermodels, on_delete=models.CASCADE, related_name="reports_received")
+    reason = models.TextField()  
+
+    def __str__(self):
+        return f"Report by {self.reporter} on {self.reported_user}"
+

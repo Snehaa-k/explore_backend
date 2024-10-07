@@ -3,11 +3,11 @@ import json
 from tokenize import TokenError
 from urllib import response
 from django.shortcuts import render
-from .models import Notification, Post, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet,ChatMessages
+from .models import Notification, Post, UserReport, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet,ChatMessages,Group,GroupChat,GroupMember
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
-from .serializer import NotificationSerializer, UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer,WalletSerializer,ChatPartnerSerializer,ChatMessageSerializer
+from .serializer import GroupSerializer, NotificationSerializer, UserReportSerializer, UserSerializer,ProfileSerializer,FormSubmission,TripSerializer,PlaceSerializer,PostSerializer,ArticleSerilizer,CommentSerializer,WalletSerializer,ChatPartnerSerializer,ChatMessageSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import update_last_login
@@ -1030,30 +1030,60 @@ class ConfirmPaymentAPIView(APIView):
     def post(self, request, *args, **kwargs):
         session_id = request.data.get('session_id')
         trip_id = request.data.get('trip_id')
+
         if not session_id:
             return Response({'error': 'session_id is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # Retrieve session from Stripe
             session = stripe.checkout.Session.retrieve(session_id)
-            print(session)
-
             if session:
                 trip = Trips.objects.get(id=trip_id)
-                print(trip)
                 user = request.user
 
-               
+                # Create a payment record
                 Payment.objects.create(
                     user=user,
                     trip=trip,
-                    amount=session.amount_total / 100, 
+                    amount=session.amount_total / 100,  
                     status='completed',
                     payment_type='stripe'
                 )
 
-               
+                # Update trip participant limit
                 trip.participant_limit -= 1
                 trip.save()
+
+                # Retrieve user's profile
+                user_profile = Usermodels.objects.get(user=user)
+
+                # Notify the trip leader
+                notification_type = "user_is_booked"
+                text = f"{user_profile.username} has booked your trip."
+                link = "/dashboard/" 
+
+                Notification.objects.create(
+                    receiver=trip.travelead,  
+                    sender=user,
+                    notification_type=notification_type,
+                    text=text,
+                    link=link,
+                    is_read=False,
+                )
+
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"notification_{trip.travelead}", 
+                    {
+                        "type": "send_notification",
+                        "data": {
+                            "type": notification_type,
+                            "sender": user_profile.username,
+                            "text": text,
+                            "link": link,
+                        },
+                    },
+                )
 
                 return Response({'success': True}, status=status.HTTP_200_OK)
 
@@ -1064,7 +1094,6 @@ class ConfirmPaymentAPIView(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
         
 
 
@@ -1561,7 +1590,7 @@ class PasswordResetRequestView(APIView):
         try:
             user = Usermodels.objects.get(email=email)
         except Usermodels.DoesNotExist:
-            return Response({"error": "User with this email does not exist."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "User with this email does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
         # token = default_token_generator.make_token(user)
         # uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
@@ -1649,7 +1678,90 @@ class EditPostAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class CreateGroupView(APIView):
+    def post(self, request, *args, **kwargs):
+        trip_id = request.data.get('trip')
+        members = request.data.get('members', [])
+        print(members,"members.....")
+        print(trip_id,"haiiiii")
 
+        try:
+            # Get the trip based on trip_id
+            trip = Trips.objects.get(id=trip_id)
+            print(trip,"heloo")
+            
+            # Check if a group already exists for this trip
+            if Group.objects.filter(trip=trip).exists():
+                return Response({"message": "Group already created for this trip."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create a new group
+            group = Group.objects.create(trip=trip)
+
+            # Add members to the group
+            for member in members:
+                user_id = member['user']  
+                user = Usermodels.objects.get(id=user_id) 
+                
+                # Create a GroupMember instance to associate user with the group
+                GroupMember.objects.create(group=group, user=user) 
+
+            # Optionally, you can serialize the group for the response
+            serializer = GroupSerializer(group)
+
+           
+
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        except Trips.DoesNotExist:
+            return Response({"message": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ReportAPIView(APIView):
+    """
+    API View for submitting a report against a travel leader.
+    """
+
+    def post(self, request, id):
+        try:
+            # Fetch the travel leader (user) by ID
+            travel_leader = Usermodels.objects.get(id=id)
+
+            # Add travel leader info to the request data for reporting
+            report_data = {
+                "reporter": travel_leader.id, 
+                "reported_user": request.user.id,  
+                "reason": request.data.get("reason")  
+            }
+            print(report_data)
+            # Use the serializer to validate and save the report
+            serializer = UserReportSerializer(data=report_data)
+
+
+            if serializer.is_valid():
+                user_report = serializer.save()
+                print(user_report)
+                report_data = UserReportSerializer(user_report).data
+
+                return Response({
+                    "message": "Report submitted successfully.",
+                    "report": report_data
+                }, status=status.HTTP_201_CREATED)
+
+            # If data is invalid, return errors
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        except Usermodels.DoesNotExist:
+            return Response({"error": "Travel leader not found."}, status=status.HTTP_404_NOT_FOUND)
+
+class UserReportListAPIView(APIView):
+    """
+    API View to retrieve all user reports.
+    """
+
+    def get(self, request):
+        reports = UserReport.objects.all()  
+        serializer = UserReportSerializer(reports, many=True)  
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
 
     

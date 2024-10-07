@@ -70,6 +70,9 @@ urlpatterns = [
     path("forgot-password/", views.PasswordResetRequestView.as_view(), name="forgot_password"),
     path("password-reset/", views.PasswordResetConfirmView.as_view(), name="password_confirm"),
     path("edit-post-view/<int:id>/", views.EditPostAPIView.as_view(), name="edit-post"),
+    path('groups/', views.CreateGroupView.as_view(), name='create_group'),
+    path('report/<int:id>/', views.ReportAPIView.as_view(), name='report-user'),
+    path('reports/', views.UserReportListAPIView.as_view(), name='user-report-list'),
 
     # path('token/refresh/', views.RefreshTokenAPIView.as_view(), name='token_refresh'),
 

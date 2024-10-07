@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Notification, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet,ChatMessages
+from .models import GroupMember, Notification, UserReport, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet,ChatMessages,Group,GroupChat
 from django.db.models import Q
 
 class UserSerializer(serializers.ModelSerializer):
@@ -135,7 +135,8 @@ class TripSerializer(serializers.ModelSerializer):
             'travelead',
             'travelead_bio',
             'travelead_address',
-            'is_refund'
+            'is_refund',
+            'is_group'
         ]
         extra_kwargs = {
             'travelead': {'read_only': True}  
@@ -357,7 +358,49 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 
+class GroupMemberSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
 
+    class Meta:
+        model = GroupMember
+        fields = ['user', 'joined_at']
+
+class GroupSerializer(serializers.ModelSerializer):
+    members = GroupMemberSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Group
+        fields = ['id', 'trip', 'members', 'created_at']
+
+    def create(self, validated_data):
+        members_data = self.context['request'].data.get('members', [])
+        group = Group.objects.create(**validated_data)
+        for member_data in members_data:
+            GroupMember.objects.create(group=group, **member_data)
+        return group
+
+class GroupChatSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)  
+    group = serializers.PrimaryKeyRelatedField(queryset=Group.objects.all())
+
+    class Meta:
+        model = GroupChat
+        fields = ['id', 'group', 'sender', 'content', 'timestamp']
+
+    def create(self, validated_data):
+        group_chat = GroupChat.objects.create(**validated_data)
+        return group_chat
+
+
+class UserReportSerializer(serializers.ModelSerializer):
+    reporter_name = serializers.CharField(source='reporter.username', read_only=True)  
+    reported_user_name = serializers.CharField(source='reported_user.username', read_only=True)  
+    reporter_email = serializers.EmailField(source='reporter.email', read_only=True)  
+    reported_user_email = serializers.EmailField(source='reported_user.email', read_only=True) 
+
+    class Meta:
+        model = UserReport
+        fields = ['reporter', 'reported_user', 'reason','reporter_email','reported_user_email','reporter_name','reported_user_name']
 
 
 
