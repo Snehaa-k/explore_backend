@@ -314,7 +314,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 class ChatPartnerSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
-    
+
 
     class Meta:
         model = Usermodels
@@ -379,6 +379,7 @@ class GroupSerializer(serializers.ModelSerializer):
             GroupMember.objects.create(group=group, **member_data)
         return group
 
+
 class GroupChatSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)  
     group = serializers.PrimaryKeyRelatedField(queryset=Group.objects.all())
@@ -390,6 +391,8 @@ class GroupChatSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         group_chat = GroupChat.objects.create(**validated_data)
         return group_chat
+
+
 
 
 class UserReportSerializer(serializers.ModelSerializer):
