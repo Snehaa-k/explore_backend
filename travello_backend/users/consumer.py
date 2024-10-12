@@ -4,7 +4,7 @@ from channels.layers import get_channel_layer
 from channels.db import database_sync_to_async
 from urllib.parse import urlparse, parse_qs
 import json
-from .models import ChatMessages, Notification,Usermodels
+from .models import ChatMessages, Notification,CustomUser
 from asgiref.sync import sync_to_async
 
 class TravelChat(AsyncWebsocketConsumer):
@@ -106,9 +106,9 @@ class TravelChat(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_username(self, user_id):
         try:
-            user = Usermodels.objects.get(id=user_id)
+            user = CustomUser.objects.get(id=user_id)
             return user.username
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return f"User {user_id}"
    
     @database_sync_to_async
@@ -126,15 +126,15 @@ class TravelChat(AsyncWebsocketConsumer):
     def save_message(self, sender, receiver, message,thread):
         
         try:
-            sender = Usermodels.objects.get(id=sender)
+            sender = CustomUser.objects.get(id=sender)
             print(sender)
             
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             print(f"Sender with ID {sender} does not exist")
           
         try:
-            receiver = Usermodels.objects.get(id=receiver)
-        except Usermodels.DoesNotExist:
+            receiver = CustomUser.objects.get(id=receiver)
+        except CustomUser.DoesNotExist:
             print(f"Receiver with ID {receiver} does not exist")
             return
         ChatMessages.objects.create(sender = sender.id,receiver = receiver.id,content = message,thread_name= thread,is_read=False) 

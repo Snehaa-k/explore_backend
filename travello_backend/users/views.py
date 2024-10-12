@@ -3,7 +3,7 @@ import json
 from tokenize import TokenError
 from urllib import response
 from django.shortcuts import render
-from .models import Notification, Post, UserReport, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet,ChatMessages,Group,GroupChat,GroupMember
+from .models import Notification, Post, UserReport, CustomUser,UserProfile,TravelLeaderForm,Country,Trips,Place,ArticlePost,Comment,Payment,Wallet,ChatMessages,Group,GroupChat,GroupMember
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status,permissions,generics
@@ -64,8 +64,8 @@ class VerifyOtp(APIView):
         email = request.data.get('email')
         otp = request.data.get('otp')
         try:
-            user = Usermodels.objects.get(email= email)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(email= email)
+        except CustomUser.DoesNotExist:
             return Response({"error": "User does not exist."}, status=status.HTTP_404_NOT_FOUND)
         
         
@@ -87,8 +87,8 @@ class SelectinTravelleader(APIView):
         role = request.data.get('role')
         roles = "traveller"
         try:
-            user = Usermodels.objects.get(email= email)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(email= email)
+        except CustomUser.DoesNotExist:
             return Response({"error": "User does not exist."}, status=status.HTTP_404_NOT_FOUND)
     
         if role == "traveller":
@@ -107,8 +107,8 @@ class Userpreference(APIView):
         email = request.data.get('email')
         preference = request.data.get('selectedPreference')
         try:
-            user = Usermodels.objects.get(email= email)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(email= email)
+        except CustomUser.DoesNotExist:
             return Response({"error": "User does not exist."}, status=status.HTTP_404_NOT_FOUND)
     
         if preference:
@@ -126,13 +126,13 @@ class SendOTPView(APIView):
     def post(self, request):
         email = request.data.get('email')
         try:
-            user = Usermodels.objects.get(email=email)
+            user = CustomUser.objects.get(email=email)
             if not user.is_verified:
                 user.generate_otp()  
                 return Response({"message": "OTP sent successfully."}, status=status.HTTP_200_OK)
             else:
                 return Response({"message": "User is already verified."}, status=status.HTTP_400_BAD_REQUEST)
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response({"message": "User not found."}, status=status.HTTP_404_NOT_FOUND)
         
 
@@ -149,8 +149,8 @@ class CustomTokenObtainPairView(APIView):
         password = request.data.get('password')
         print(settings.AUTH_USER_MODEL)
         try:
-            user = Usermodels.objects.get(email=email)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
             return Response({'error': ' Invalid email Address'}, status=status.HTTP_401_UNAUTHORIZED)
         if not check_password(password, user.password):
             return Response({'error': 'Invalid Password'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -196,8 +196,8 @@ class FormSubmissionView(APIView):
          
         
         try:
-            user_id = Usermodels.objects.get(email=user)
-        except Usermodels.DoesNotExist:
+            user_id = CustomUser.objects.get(email=user)
+        except CustomUser.DoesNotExist:
             return Response({"error": "User does not exist."}, status=status.HTTP_404_NOT_FOUND)
         
         if not all([firstname, lastname, user, mobile]):
@@ -263,7 +263,7 @@ class AcceptTravelLeaderView(APIView):
         
         try:
             form = TravelLeaderForm.objects.get(id=pk)
-            user = Usermodels.objects.get(email = form.user_id.email)
+            user = CustomUser.objects.get(email = form.user_id.email)
         except TravelLeaderForm.DoesNotExist:
             return Response({'error': 'Travel Leader Form not found'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -281,7 +281,7 @@ class RejectTravelLeaderView(APIView):
        
         try:
             form = TravelLeaderForm.objects.get(id=pk)
-            user = Usermodels.objects.get(email = form.user_id.email)
+            user = CustomUser.objects.get(email = form.user_id.email)
             
         except TravelLeaderForm.DoesNotExist:
             return Response({'error': 'Travel Leader Form not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -296,7 +296,7 @@ class RejectTravelLeaderView(APIView):
 
 
 class TravellersView(generics.ListAPIView):
-    queryset = Usermodels.objects.filter(~Q(is_superuser=True) & ~Q(is_travel_leader=True))
+    queryset = CustomUser.objects.filter(~Q(is_superuser=True) & ~Q(is_travel_leader=True))
     serializer_class = UserSerializer
 
 
@@ -306,8 +306,8 @@ class is_Block(APIView):
     def post(self, request, pk, *args, **kwargs):
        
         try:
-           user = Usermodels.objects.get(id = pk)  
-        except Usermodels.DoesNotExist:
+           user = CustomUser.objects.get(id = pk)  
+        except CustomUser.DoesNotExist:
             return Response({'error': 'Travel Leader Form not found'}, status=status.HTTP_404_NOT_FOUND)
         user.is_block = not user.is_block
         user.save()
@@ -327,7 +327,7 @@ class TravellerProfile(APIView):
         
         try:
             
-            user = Usermodels.objects.get(id=request.user.id)
+            user = CustomUser.objects.get(id=request.user.id)
 
             
             try:
@@ -353,7 +353,7 @@ class TravellerProfile(APIView):
                 cache.set(f'user_profile_{user_id}', response_data, timeout=600)
                 return Response({"user":user_serializer.data}, status=status.HTTP_200_OK)
 
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
     
     
@@ -369,10 +369,10 @@ class UserProfileEdit(APIView):
     def get(self, request, *args, **kwargs):
         user_id = request.user.id
         try:
-            profile = Usermodels.objects.get(id=user_id)
+            profile = CustomUser.objects.get(id=user_id)
 
             
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = UserSerializer(profile)
@@ -425,8 +425,8 @@ class CreateTrip(APIView):
     def post(self, request):
         
         try:
-            user = Usermodels.objects.get(id=request.user.id)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(id=request.user.id)
+        except CustomUser.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
         new_trip_start_date = parse_date(request.data.get('start_date'))
@@ -574,7 +574,7 @@ class ViewPlaces(APIView):
 
     def get(self, request,id, *args, **kwargs):
         
-        user = Usermodels.objects.get(id = request.user.id)
+        user = CustomUser.objects.get(id = request.user.id)
         if user:
         
             try:
@@ -639,8 +639,8 @@ class ViewAllTrips(APIView):
     def get(self, request, *args, **kwargs):
         user_id = request.user.id
         try:
-            user = Usermodels.objects.get(id = user_id)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(id = user_id)
+        except CustomUser.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
         if user:
             today = timezone.now().date()
@@ -663,8 +663,8 @@ class TripDetails(APIView):
     def get(self, request,id, *args, **kwargs):
         user_id = request.user.id
         try:
-            user = Usermodels.objects.get(id = user_id)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(id = user_id)
+        except CustomUser.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
         if user:
             try:
@@ -686,8 +686,8 @@ class PlaceDetails(APIView):
     def get(self, request,id, *args, **kwargs):
         user_id = request.user.id
         try:
-            user = Usermodels.objects.get(id = user_id)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(id = user_id)
+        except CustomUser.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
         if user:
 
@@ -705,8 +705,8 @@ class PlaceDetails(APIView):
 class PostCreation(APIView):
     def post(self, request):
         try:
-            user = Usermodels.objects.get(id=request.user.id)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(id=request.user.id)
+        except CustomUser.DoesNotExist:
             return Response({'error': 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = PostSerializer(data=request.data, context={'request': request})
@@ -724,8 +724,8 @@ class PostCreation(APIView):
 class ArticlePosts(APIView):
     def post(self, request):
         try:
-            user = Usermodels.objects.get(id=request.user.id)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(id=request.user.id)
+        except CustomUser.DoesNotExist:
             return Response({'error': 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = ArticleSerilizer(data=request.data, context={'request': request})
@@ -747,7 +747,7 @@ class ViewPosts(APIView):
     def get(self, request, *args, **kwargs):
         try:
             
-            user = Usermodels.objects.get(id=request.user.id)
+            user = CustomUser.objects.get(id=request.user.id)
             
             try:
                 posts = Post.objects.select_related('travel_leader')
@@ -762,7 +762,7 @@ class ViewPosts(APIView):
                 
                 return Response({"message":"no posts"}, status=status.HTTP_404_NOT_FOUND)
 
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
@@ -771,7 +771,7 @@ class ViewArticle(APIView):
     def get(self, request, *args, **kwargs):
         try:
             
-            user = Usermodels.objects.get(id=request.user.id)
+            user = CustomUser.objects.get(id=request.user.id)
             
             try:
                 article = ArticlePost.objects.select_related('travel_leader')
@@ -783,7 +783,7 @@ class ViewArticle(APIView):
                 
                 return Response({"message":"no posts"}, status=status.HTTP_404_NOT_FOUND)
 
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
         
 
@@ -794,9 +794,9 @@ class ViewUser(APIView):
     def get(self, request, *args, **kwargs):
         user_id = request.user.id
         try:
-            user = Usermodels.objects.get(id = user_id)
+            user = CustomUser.objects.get(id = user_id)
             profile_img = UserProfile.objects.get(user = user)
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
         user_serializer = UserSerializer(user)
         profile = ProfileSerializer(profile_img)
@@ -899,7 +899,7 @@ class CreateStripeSessionAPIView(APIView):
             if not user:
                 return Response({'error': 'User is not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
             
-            user_id = Usermodels.objects.get(id=user.id)
+            user_id = CustomUser.objects.get(id=user.id)
             trip_id = request.data.get('trip_id')
             if not trip_id:
                 return Response({'error': 'trip_id is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -970,7 +970,7 @@ class ConfirmPaymentAPIView(APIView):
                 trip.participant_limit -= 1
                 trip.save()
 
-                user_profile = Usermodels.objects.get(user=user)
+                user_profile = CustomUser.objects.get(user=user)
 
                 notification_type = "user_is_booked"
                 text = f"{user_profile.username} has booked your trip."
@@ -1025,7 +1025,7 @@ class FollowUserView(APIView):
     def post(self, request,id):
         user = request.user
         try:
-            users = Usermodels.objects.get(id = request.user.id)
+            users = CustomUser.objects.get(id = request.user.id)
             profile = UserProfile.objects.get(user = id)
             
             if profile.followers.filter(id=request.user.id).exists():
@@ -1033,7 +1033,7 @@ class FollowUserView(APIView):
                 return Response({'message': 'Unfollowed successfully'}, status=status.HTTP_200_OK)
             else:
                 profile.followers.add(request.user)
-                receiver = Usermodels.objects.get(id=id)
+                receiver = CustomUser.objects.get(id=id)
 
                 notification_type = "follow"
                 text = f"{users.username} started following you"
@@ -1090,7 +1090,7 @@ class Followviewtravellers(APIView):
     def get(self, request):
         user = request.user.id
         try:
-            user_profile = Usermodels.objects.get(id=user)
+            user_profile = CustomUser.objects.get(id=user)
             total_completed_trip = Payment.objects.filter(user = user,trip__is_completed = 'completed').count()
             
             followed_travel_leaders = UserProfile.objects.filter(followers=user_profile)
@@ -1174,7 +1174,7 @@ class ShowWallet(APIView):
         try:
             
             wallet = Wallet.objects.get(user=user)
-            user_profile = Usermodels.objects.get(id=request.user.id)
+            user_profile = CustomUser.objects.get(id=request.user.id)
             total_completed_trip = Payment.objects.filter(user = user,trip__is_completed = 'completed').count()
             
             followed_travel_leaders = UserProfile.objects.filter(followers=user_profile)
@@ -1258,7 +1258,7 @@ class ChatPartnersView(generics.ListAPIView):
 
         chat_partners_ids = set(sender_ids) | set(receiver_ids) 
 
-        return Usermodels.objects.filter(id__in=chat_partners_ids) 
+        return CustomUser.objects.filter(id__in=chat_partners_ids) 
 
 
 class MessageListView(generics.ListAPIView):
@@ -1391,7 +1391,7 @@ class RefundAPIView(APIView):
 class ViewPostsTravelleader(APIView):
     def get(self, request, *args, **kwargs):
         try:
-            user = Usermodels.objects.get(id=request.user.id)
+            user = CustomUser.objects.get(id=request.user.id)
             
             try:
                 posts = Post.objects.filter(travel_leader=user).select_related('travel_leader')
@@ -1417,7 +1417,7 @@ class ViewPostsTravelleader(APIView):
             except Post.DoesNotExist:
                 return Response({"message": "no posts"}, status=status.HTTP_404_NOT_FOUND)
 
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
         
 
@@ -1459,8 +1459,8 @@ class PasswordResetRequestView(APIView):
     def post(self, request):
         email = request.data.get('email')
         try:
-            user = Usermodels.objects.get(email=email)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
             return Response({"error": "User with this email does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
        
@@ -1493,8 +1493,8 @@ class PasswordResetConfirmView(APIView):
             return Response({'error': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = Usermodels.objects.get(id=user_id)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(id=user_id)
+        except CustomUser.DoesNotExist:
             return Response({'error': 'Invalid user ID'}, status=status.HTTP_400_BAD_REQUEST)
         
         if user.reset_token != token:
@@ -1516,8 +1516,8 @@ class PasswordResetConfirmView(APIView):
 class EditPostAPIView(APIView):
     def put(self, request, id):
         try:
-            user = Usermodels.objects.get(id=request.user.id)
-        except Usermodels.DoesNotExist:
+            user = CustomUser.objects.get(id=request.user.id)
+        except CustomUser.DoesNotExist:
             return Response({'error': 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
@@ -1554,7 +1554,7 @@ class CreateGroupView(APIView):
 
             for member in members:
                 user_id = member['user']  
-                user = Usermodels.objects.get(id=user_id) 
+                user = CustomUser.objects.get(id=user_id) 
                 
                 GroupMember.objects.create(group=group, user=user) 
 
@@ -1575,7 +1575,7 @@ class ReportAPIView(APIView):
 
     def post(self, request, id):
         try:
-            travel_leader = Usermodels.objects.get(id=id)
+            travel_leader = CustomUser.objects.get(id=id)
 
             report_data = {
                 "reporter": travel_leader.id, 
@@ -1594,7 +1594,7 @@ class ReportAPIView(APIView):
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        except Usermodels.DoesNotExist:
+        except CustomUser.DoesNotExist:
             return Response({"error": "Travel leader not found."}, status=status.HTTP_404_NOT_FOUND)
 
 

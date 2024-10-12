@@ -45,6 +45,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "users",
     "channels",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -55,7 +56,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
-    "users",
+    
 ]
 
 ASGI_APPLICATION = "travello_backend.asgi.application"
@@ -138,7 +139,7 @@ WSGI_APPLICATION = "travello_backend.wsgi.application"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 
-AUTH_USER_MODEL = "users.Usermodels"
+AUTH_USER_MODEL = "users.CustomUser"
 
 DATABASES = {
     "default": {
@@ -190,11 +191,19 @@ CACHE_TTL = 60 * 15
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/1",
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
+         'LOCATION': 'redis://redis:6379/0',  
+        
     }
+}
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],  
+        },
+    },
 }
 
 

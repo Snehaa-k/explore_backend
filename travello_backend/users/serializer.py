@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import GroupMember, Notification, UserReport, Usermodels,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet,ChatMessages,Group,GroupChat
+from .models import GroupMember, Notification, UserReport, CustomUser,UserProfile,TravelLeaderForm,Country,Trips,Place,Post,ArticlePost,Comment,Payment, Wallet,ChatMessages,Group,GroupChat
 from django.db.models import Q
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Usermodels
+        model = CustomUser
         fields = ['id', 'is_travel_leader', 'email', 'password','username','is_verified','is_block','user_preference','is_approve_leader','date_joined']
         extra_kwargs = {'password': {'write_only': True}}
 
@@ -19,7 +19,7 @@ class UserSerializer(serializers.ModelSerializer):
         return instance
     
     def create(self, validated_data):
-        user = Usermodels.objects.create_user(**validated_data)
+        user = CustomUser.objects.create_user(**validated_data)
         user.generate_otp()
         return user
     
@@ -317,7 +317,7 @@ class ChatPartnerSerializer(serializers.ModelSerializer):
 
 
     class Meta:
-        model = Usermodels
+        model = CustomUser
         fields = ['id', 'username', 'last_message','unread_count']
 
     def get_last_message(self, obj):
