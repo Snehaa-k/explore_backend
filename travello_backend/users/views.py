@@ -147,6 +147,7 @@ class CustomTokenObtainPairView(APIView):
     def post(self, request, *args, **kwargs):
         email = request.data.get('email')
         password = request.data.get('password')
+        print(settings.AUTH_USER_MODEL)
         try:
             user = Usermodels.objects.get(email=email)
         except Usermodels.DoesNotExist:
