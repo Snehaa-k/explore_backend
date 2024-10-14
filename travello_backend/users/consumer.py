@@ -127,7 +127,6 @@ class TravelChat(AsyncWebsocketConsumer):
         
         try:
             sender = CustomUser.objects.get(id=sender)
-            print(sender)
             
         except CustomUser.DoesNotExist:
             print(f"Sender with ID {sender} does not exist")
@@ -135,7 +134,6 @@ class TravelChat(AsyncWebsocketConsumer):
         try:
             receiver = CustomUser.objects.get(id=receiver)
         except CustomUser.DoesNotExist:
-            print(f"Receiver with ID {receiver} does not exist")
             return
         ChatMessages.objects.create(sender = sender.id,receiver = receiver.id,content = message,thread_name= thread,is_read=False) 
 
@@ -158,28 +156,24 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 self.channel_name
             )
-            print("Socket connected for user:", user_id, self.room_group_name,self.channel_name)
-            print(f"User {user_id} connected to notification group {self.room_group_name}")
             await self.accept()
         except (ValueError, TypeError) as e:
             await self.close(code=4000)
             self.room_group_name = None
 
     async def disconnect(self, close_code):
-        # Check if the group exists before trying to discard
         if hasattr(self, 'room_group_name') and self.room_group_name:
             # Leave room group
             await self.channel_layer.group_discard(
                 self.room_group_name,
                 self.channel_name
             )
-            print("Socket disconnected")
         else:
             print("No room group to disconnect from")
 
     async def send_notification(self, event):
         # notification = event['notification']
-        print(event,"haiiillllllllllllllllllllllllllllllllllllllllll")
+        # print(event,"haiiillllllllllllllllllllllllllllllllllllllllll")
         # timestamp = event.get('timestamp', None)  
 
         await self.send(text_data=json.dumps(event["data"]))
